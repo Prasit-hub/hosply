@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id               String       @id @default(uuid())
+  username         String       @unique
+  passwordHash     String
+  firstName        String
+  lastName         String
+  professionalId   String?      // e.g., Medical License Number
+  roleId           String
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  deletedAt        DateTime?    // Soft delete
+
+  role             Role         @relation(fields: [roleId], references: [id])
+  devices          Device[]
+  sessions         Session[]
+  memberships      RoomMember[]
+  sentMessages     Message[]    @relation("SentMessages")
+  auditLogs        AuditLog[]
+}
+
+model Role {
+  id          String       @id @default(uuid())
+  name        String       @unique // Doctor, Nurse, Pharmacist, Admin, etc.
+  description String?
+  permissions Permission[]
+  users       User[]
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  action      String   @unique // e.g., 'READ_CONFIDENTIAL', 'EXPORT_AUDIT'
+  description String?
+  roles       Role[]
+}
+
+model ChatRoom {
+  id               String       @id @default(uuid())
+  name             String?      // Nullable for 1-on-1 DM
+  type             String       // 'DIRECT', 'GROUP', 'PATIENT_CONTEXT'
+  patientContextId String?      @unique
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  patientContext   PatientContext? @relation(fields: [patientContextId], references: [id])
+  members          RoomMember[]
+  messages         Message[]
+}
+
+model PatientContext {
+  id         String    @id @default(uuid())
+  hn         String    // Hospital Number
+  an         String?   // Admission Number
+  nameHash   String    // Hashed or encrypted patient name for search/display
+  status     String    // 'ACTIVE', 'DISCHARGED'
+  chatRoom   ChatRoom?
+}
+
+model RoomMember {
+  id         String   @id @default(uuid())
+  roomId     String
+  userId     String
+  joinedAt   DateTime @default(now())
+  lastReadAt DateTime @default(now())
+  role       String   @default("MEMBER") // 'ADMIN', 'MEMBER'
+
+  room       ChatRoom @relation(fields: [roomId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@unique([roomId, userId])
+}
+
+model Message {
+  id               String    @id @default(uuid())
+  roomId           String
+  senderId         String
+  content          String    // Encrypted at application layer
+  classification   String    // 'PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED'
+  replyToId        String?
+  isPinned         Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  room             ChatRoom  @relation(fields: [roomId], references: [id])
+  sender           User      @relation("SentMessages", fields: [senderId], references: [id])
+  replyTo          Message?  @relation("Replies", fields: [replyToId], references: [id])
+  replies          Message[] @relation("Replies")
+  attachments      Attachment[]
+}
+
+model Attachment {
+  id           String   @id @default(uuid())
+  messageId    String
+  fileName     String
+  fileType     String
+  fileSize     Int
+  storageKey   String   // MinIO object key
+  createdAt    DateTime @default(now())
+
+  message      Message  @relation(fields: [messageId], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String   // 'LOGIN', 'MESSAGE_SENT', 'FILE_DOWNLOAD', 'DLP_TRIGGERED'
+  entity    String   // 'Message', 'User', 'File'
+  entityId  String?
+  details   String   // JSON string of event details
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model Device {
+  id         String   @id @default(uuid())
+  userId     String
+  deviceToken String  // For push notifications
+  deviceType String   // 'iOS', 'Android', 'Web'
+  lastActive DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  refreshToken String   @unique
+  expiresAt    DateTime
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id])
+}
