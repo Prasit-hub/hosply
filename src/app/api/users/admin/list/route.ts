@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyJwtAndGetUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { decrypt } from '@/common/utils/crypto';
 
 export async function GET(req: Request) {
   const user = await verifyJwtAndGetUser(req);
@@ -34,8 +35,8 @@ export async function GET(req: Request) {
     const result = users.map(u => ({
       id: u.id,
       username: u.username,
-      firstName: u.firstName,
-      lastName: u.lastName,
+      firstName: decrypt(u.firstName),
+      lastName: decrypt(u.lastName),
       professionalId: u.professionalId,
       isActive: u.isActive,
       roleId: u.role.id,

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyJwtAndGetUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import * as bcrypt from 'bcrypt';
+import { encrypt, decrypt } from '@/common/utils/crypto';
 
 export async function POST(req: Request) {
   const user = await verifyJwtAndGetUser(req);
@@ -30,8 +31,8 @@ export async function POST(req: Request) {
       data: {
         username,
         passwordHash,
-        firstName,
-        lastName,
+        firstName: encrypt(firstName),
+        lastName: encrypt(lastName),
         professionalId: professionalId || null,
         roleId,
       },
@@ -43,8 +44,8 @@ export async function POST(req: Request) {
       user: {
         id: newUser.id,
         username: newUser.username,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
+        firstName: decrypt(newUser.firstName),
+        lastName: decrypt(newUser.lastName),
         professionalId: newUser.professionalId,
         role: newUser.role.name,
         isActive: newUser.isActive,

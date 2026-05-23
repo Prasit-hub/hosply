@@ -30,6 +30,8 @@ app.prepare().then(() => {
     },
   });
 
+  (global as any).io = io;
+
   // Authentication Middleware for Socket.IO
   io.use(async (socket: Socket, nextFn) => {
     try {
@@ -74,8 +76,27 @@ app.prepare().then(() => {
     }
   });
 
-  io.on('connection', (socket: Socket) => {
+  io.on('connection', async (socket: Socket) => {
     const user = socket.data.user;
+    
+    if (user) {
+      socket.join(`user_${user.id}`);
+      console.log(`[Socket] User ${user.username} joined personal room: user_${user.id}`);
+
+      // Auto-join all rooms the user is currently a member of
+      try {
+        const memberships = await prisma.roomMember.findMany({
+          where: { userId: user.id },
+          select: { roomId: true },
+        });
+        memberships.forEach((m) => {
+          socket.join(`room_${m.roomId}`);
+          console.log(`[Socket] Auto-joined Room: room_${m.roomId} for user ${user.username}`);
+        });
+      } catch (err) {
+        console.error('[Socket] Failed to auto-join rooms on connection:', err);
+      }
+    }
 
     socket.on('joinRoom', async (data: { roomId: string }) => {
       if (!user) return;

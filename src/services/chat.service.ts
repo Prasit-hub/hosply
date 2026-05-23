@@ -29,22 +29,44 @@ export class ChatService {
       },
     });
 
-    return memberships.map(m => {
-      // Setup default room name for Direct Messages (DM) using other participant's name
-      let roomName = m.room.name;
-      if (m.room.type === 'DIRECT') {
-        const otherMember = m.room.members.find(rm => rm.userId !== userId);
-        if (otherMember) {
-          roomName = `${otherMember.user.firstName} ${otherMember.user.lastName} (${otherMember.user.role.name})`;
+    return Promise.all(
+      memberships.map(async (m) => {
+        const unreadCount = await prisma.message.count({
+          where: {
+            roomId: m.roomId,
+            createdAt: { gt: m.lastReadAt },
+            senderId: { not: userId },
+          },
+        });
+
+        // Setup default room name for Direct Messages (DM) using other participant's name
+        let roomName = m.room.name;
+        if (m.room.type === 'DIRECT') {
+          const otherMember = m.room.members.find(rm => rm.userId !== userId);
+          if (otherMember) {
+            roomName = `${decrypt(otherMember.user.firstName)} ${decrypt(otherMember.user.lastName)} (${otherMember.user.role.name})`;
+          }
         }
-      }
-      return {
-        ...m.room,
-        name: roomName,
-        lastReadAt: m.lastReadAt,
-        roleInRoom: m.role,
-      };
-    });
+
+        const decryptedMembers = m.room.members.map(rm => ({
+          ...rm,
+          user: {
+            ...rm.user,
+            firstName: decrypt(rm.user.firstName),
+            lastName: decrypt(rm.user.lastName),
+          }
+        }));
+
+        return {
+          ...m.room,
+          name: roomName,
+          members: decryptedMembers,
+          lastReadAt: m.lastReadAt,
+          roleInRoom: m.role,
+          unreadCount,
+        };
+      })
+    );
   }
 
   async getRoomMessages(roomId: string, userId: string, limit = 50, cursor?: string) {
@@ -69,6 +91,9 @@ export class ChatService {
     }
 
     const where: any = { roomId, deletedAt: null };
+    if (membership.clearedAt) {
+      where.createdAt = { gt: membership.clearedAt };
+    }
     if (cursor) {
       where.id = { lt: cursor };
     }
@@ -110,10 +135,31 @@ export class ChatService {
       return {
         ...msg,
         content,
+        sender: {
+          ...msg.sender,
+          firstName: decrypt(msg.sender.firstName),
+          lastName: decrypt(msg.sender.lastName),
+          role: msg.sender.role.name,
+        },
       };
     });
 
     return mappedMessages.reverse();
+  }
+
+  async clearRoomHistory(roomId: string, userId: string) {
+    const membership = await prisma.roomMember.findUnique({
+      where: { roomId_userId: { roomId, userId } },
+    });
+
+    if (!membership) {
+      throw new Error('You are not a member of this chat room');
+    }
+
+    return prisma.roomMember.update({
+      where: { roomId_userId: { roomId, userId } },
+      data: { clearedAt: new Date() },
+    });
   }
 
   async createRoom(dto: { name?: string; type: string; memberIds: string[]; patientHn?: string }, creatorId: string) {
@@ -285,6 +331,12 @@ export class ChatService {
     return {
       ...message,
       content,
+      sender: {
+        ...message.sender,
+        firstName: decrypt(message.sender.firstName),
+        lastName: decrypt(message.sender.lastName),
+        role: message.sender.role.name,
+      },
     };
   }
 
@@ -348,7 +400,11 @@ export class ChatService {
     return {
       message: `Successfully added ${toAddIds.length} new members to the group`,
       addedCount: toAddIds.length,
-      addedMembers: existingUsers.filter(u => toAddIds.includes(u.id)),
+      addedMembers: existingUsers.filter(u => toAddIds.includes(u.id)).map(u => ({
+        ...u,
+        firstName: decrypt(u.firstName),
+        lastName: decrypt(u.lastName),
+      })),
     };
   }
 

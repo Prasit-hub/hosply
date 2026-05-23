@@ -1,5 +1,6 @@
 import * as jwt from 'jsonwebtoken';
 import { prisma } from './db';
+import { decrypt } from '@/common/utils/crypto';
 
 const rawJwtSecret = process.env.JWT_SECRET;
 const JWT_SECRET = (rawJwtSecret && rawJwtSecret !== 'undefined' && rawJwtSecret !== 'null')
@@ -36,8 +37,8 @@ export async function verifyJwtAndGetUser(req: Request): Promise<AuthenticatedUs
     return {
       id: user.id,
       username: user.username,
-      firstName: user.firstName,
-      lastName: user.lastName,
+      firstName: decrypt(user.firstName),
+      lastName: decrypt(user.lastName),
       role: user.role.name,
     };
   } catch (error) {

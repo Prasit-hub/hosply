@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyJwtAndGetUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import * as bcrypt from 'bcrypt';
+import { encrypt, decrypt } from '@/common/utils/crypto';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await verifyJwtAndGetUser(req);
@@ -35,8 +36,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const updateData: any = {};
     if (username) updateData.username = username;
-    if (firstName) updateData.firstName = firstName;
-    if (lastName) updateData.lastName = lastName;
+    if (firstName) updateData.firstName = encrypt(firstName);
+    if (lastName) updateData.lastName = encrypt(lastName);
     if (professionalId !== undefined) updateData.professionalId = professionalId || null;
     if (roleId) updateData.roleId = roleId;
     if (isActive !== undefined) updateData.isActive = isActive;
@@ -56,8 +57,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       user: {
         id: updatedUser.id,
         username: updatedUser.username,
-        firstName: updatedUser.firstName,
-        lastName: updatedUser.lastName,
+        firstName: decrypt(updatedUser.firstName),
+        lastName: decrypt(updatedUser.lastName),
         professionalId: updatedUser.professionalId,
         role: updatedUser.role.name,
         isActive: updatedUser.isActive,

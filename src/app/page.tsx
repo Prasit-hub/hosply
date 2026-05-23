@@ -35,7 +35,9 @@ import {
   Layers,
   Sparkles,
   Info,
-  X
+  X,
+  Pin,
+  Trash2
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
@@ -65,6 +67,7 @@ interface ChatRoom {
   lastReadAt?: string;
   roleInRoom?: string;
   members?: any[];
+  unreadCount?: number;
 }
 
 interface Message {
@@ -137,9 +140,88 @@ export default function ClinicalPlatform() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Chat Interface States
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
+  const [hasMoreMessages, setHasMoreMessages] = useState<boolean>(false);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+  const [pinnedRoomIds, setPinnedRoomIds] = useState<string[]>([]);
+
+  // Unified Custom Clinical Modal system
+  const [clinicalModal, setClinicalModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'info' | 'error' | 'success' | 'confirm' | 'warning';
+    onConfirm?: () => void;
+    onCancel?: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
+
+  const showClinicalModal = (
+    title: string,
+    message: string,
+    type: 'info' | 'error' | 'success' | 'confirm' | 'warning' = 'info',
+    onConfirm?: () => void,
+    onCancel?: () => void
+  ) => {
+    setClinicalModal({
+      isOpen: true,
+      title,
+      message,
+      type,
+      onConfirm: () => {
+        setClinicalModal(prev => ({ ...prev, isOpen: false }));
+        if (onConfirm) onConfirm();
+      },
+      onCancel: () => {
+        setClinicalModal(prev => ({ ...prev, isOpen: false }));
+        if (onCancel) onCancel();
+      },
+    });
+  };
+
+  // Load pinned rooms from localStorage on client-side mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('hosply_pinned_rooms');
+      if (stored) {
+        try {
+          setPinnedRoomIds(JSON.parse(stored));
+        } catch (e) {
+          console.error('[Storage] Pinned Rooms Deserialization Error:', e);
+        }
+      }
+    }
+  }, []);
+
+  const togglePinRoom = (roomId: string) => {
+    setPinnedRoomIds((prev) => {
+      const next = prev.includes(roomId)
+        ? prev.filter((id) => id !== roomId)
+        : [...prev, roomId];
+      localStorage.setItem('hosply_pinned_rooms', JSON.stringify(next));
+      showToast(
+        prev.includes(roomId) ? 'Discussion unpinned successfully' : 'Discussion pinned to top!',
+        'success'
+      );
+      return next;
+    });
+  };
+
+  const activeRoomRef = useRef<ChatRoom | null>(null);
+  const roomsRef = useRef<ChatRoom[]>([]);
+
+  useEffect(() => {
+    activeRoomRef.current = activeRoom;
+  }, [activeRoom]);
+
+  useEffect(() => {
+    roomsRef.current = rooms;
+  }, [rooms]);
 
   // Save active room ID to localStorage
   useEffect(() => {
@@ -237,6 +319,7 @@ export default function ClinicalPlatform() {
   // Refs
   const socketRef = useRef<Socket | null>(null);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
+  const shouldScrollToBottomRef = useRef<boolean>(true);
 
   // API base URL
   const API_URL = typeof window !== 'undefined' ? window.location.origin : '';
@@ -253,7 +336,11 @@ export default function ClinicalPlatform() {
 
   // Scroll to bottom on new message
   useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (shouldScrollToBottomRef.current) {
+      messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      shouldScrollToBottomRef.current = true;
+    }
   }, [messages, typingUsers]);
 
   // Client-side real-time DLP Regex Scan
@@ -299,6 +386,40 @@ export default function ClinicalPlatform() {
     }
   }, [messageInput]);
 
+  // Gentle clinical chime notification sound using Web Audio API
+  const playNotificationSound = () => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      const now = ctx.currentTime;
+
+      // Play a gentle two-tone chime: E5 followed by A5
+      const playTone = (freq: number, startTime: number, duration: number) => {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+
+        gainNode.gain.setValueAtTime(0, startTime);
+        gainNode.gain.linearRampToValueAtTime(0.08, startTime + 0.04);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+
+      playTone(659.25, now, 0.35); // E5
+      playTone(880.00, now + 0.12, 0.5); // A5
+    } catch (e) {
+      console.warn('AudioContext playback failed:', e);
+    }
+  };
+
   // Fetch initial data upon login
   useEffect(() => {
     if (!currentUser) return;
@@ -325,13 +446,54 @@ export default function ClinicalPlatform() {
     });
 
     socket.on('newMessage', (msg: Message) => {
+      const isMe = msg.sender.id === currentUser.id;
+
+      if (!isMe) {
+        // Play gentle chime
+        playNotificationSound();
+
+        // If message is in another room, display custom toast signal
+        const currentActiveRoom = activeRoomRef.current;
+        if (!currentActiveRoom || msg.roomId !== currentActiveRoom.id) {
+          // Fetch updated rooms list to update unread counts
+          fetchRooms();
+          
+          // Show toast alert
+          const targetRoom = roomsRef.current.find((r) => r.id === msg.roomId);
+          const roomLabel = targetRoom ? targetRoom.name : 'another discussion';
+          showToast(`New message in ${roomLabel} from ${msg.sender.firstName}: "${msg.content.substring(0, 30)}${msg.content.length > 30 ? '...' : ''}"`, 'info');
+        } else {
+          // Active room: mark as read immediately by emitting readRoom to clear unread database count
+          socket.emit('readRoom', { roomId: currentActiveRoom.id });
+        }
+      }
+
       // Append if it's the active room
       setMessages((prev) => {
+        const currentActiveRoom = activeRoomRef.current;
+        if (!currentActiveRoom || msg.roomId !== currentActiveRoom.id) return prev;
         if (prev.some((m) => m.id === msg.id)) return prev;
         return [...prev, msg];
       });
 
       // Update room last reading status
+      fetchRooms();
+    });
+
+    socket.on('roomJoined', (data: any) => {
+      console.log('[Socket] You joined or were invited to a new room:', data);
+      fetchRooms();
+      showToast('You have been added to a new chat group!', 'success');
+      playNotificationSound();
+      
+      // Auto-join the new room's socket channel so we can receive its messages
+      if (data.roomId && socketRef.current) {
+        socketRef.current.emit('joinRoom', { roomId: data.roomId });
+      }
+    });
+
+    socket.on('roomMembersUpdated', (data: any) => {
+      console.log('[Socket] Room roster updated:', data);
       fetchRooms();
     });
 
@@ -362,17 +524,19 @@ export default function ClinicalPlatform() {
     setMessages([]);
     setTypingUsers([]);
 
-    // Subscribe to Socket Room
+    // Instantly clear the unread count for this room locally in rooms list state for zero-latency UX feel!
+    setRooms((prevRooms) =>
+      prevRooms.map((r) =>
+        r.id === activeRoom.id ? { ...r, unreadCount: 0 } : r
+      )
+    );
+
+    // Subscribe to Socket Room and mark as read on server to update database record
     socketRef.current.emit('joinRoom', { roomId: activeRoom.id });
+    socketRef.current.emit('readRoom', { roomId: activeRoom.id });
 
     // Fetch message history REST
     fetchMessages(activeRoom.id);
-
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.emit('leaveRoom', { roomId: activeRoom!.id });
-      }
-    };
   }, [activeRoom]);
 
   // --- API CALLS ---
@@ -527,14 +691,34 @@ export default function ClinicalPlatform() {
     }
   };
 
-  const fetchMessages = async (roomId: string) => {
+  const fetchMessages = async (roomId: string, isInitial = true) => {
     try {
-      const res = await fetch(`${API_URL}/api/rooms/${roomId}/messages`, {
+      const limit = 20;
+      let url = `${API_URL}/api/rooms/${roomId}/messages?limit=${limit}`;
+
+      if (!isInitial && messages.length > 0) {
+        const oldestMessageId = messages[0].id;
+        url += `&cursor=${oldestMessageId}`;
+        setIsLoadingMore(true);
+        shouldScrollToBottomRef.current = false;
+      } else {
+        shouldScrollToBottomRef.current = true;
+        setHasMoreMessages(false);
+      }
+
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${currentUser?.accessToken}` },
       });
+
       if (res.ok) {
         const data = await res.json();
-        setMessages(data);
+        if (isInitial) {
+          setMessages(data);
+          setHasMoreMessages(data.length === limit);
+        } else {
+          setMessages((prev) => [...data, ...prev]);
+          setHasMoreMessages(data.length === limit);
+        }
       } else {
         throw new Error();
       }
@@ -588,8 +772,52 @@ export default function ClinicalPlatform() {
           },
         ],
       };
-      setMessages(mockMessages[roomId] || []);
+      if (isInitial) {
+        setMessages(mockMessages[roomId] || []);
+        setHasMoreMessages(false);
+      }
+    } finally {
+      setIsLoadingMore(false);
     }
+  };
+
+  const handleLoadMoreMessages = async () => {
+    if (isLoadingMore || !activeRoom) return;
+    await fetchMessages(activeRoom.id, false);
+  };
+
+  const handleClearChatHistory = (roomId: string) => {
+    showClinicalModal(
+      'Clear Chat History',
+      'Are you sure you want to clear your chat history for this direct message? This will only delete history on your screen, and cannot be undone.',
+      'confirm',
+      async () => {
+        try {
+          const res = await fetch(`${API_URL}/api/rooms/${roomId}/clear`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${currentUser?.accessToken}`,
+            },
+          });
+
+          if (!res.ok) {
+            throw new Error('Failed to clear chat history');
+          }
+
+          showToast('Chat history cleared locally!', 'success');
+          
+          if (activeRoom && activeRoom.id === roomId) {
+            setMessages([]);
+          }
+        } catch (error: any) {
+          showClinicalModal(
+            'Action Blocked',
+            error.message || 'An error occurred while clearing history.',
+            'error'
+          );
+        }
+      }
+    );
   };
 
   const fetchDirectory = async () => {
@@ -747,54 +975,165 @@ export default function ClinicalPlatform() {
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !activeRoom) return;
+  const resizeAndCompressImage = (file: File, maxSizeKB = 100): Promise<{ file: File; dataUrl: string }> => {
+    return new Promise((resolve, reject) => {
+      // If not an image or already under 100KB, read directly and return
+      if (!file.type.startsWith('image/') || file.size <= maxSizeKB * 1024) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          resolve({ file, dataUrl: reader.result as string });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+        return;
+      }
 
-    const reader = new FileReader();
-    reader.onload = async () => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve({ file, dataUrl: event.target?.result as string });
+            return;
+          }
+
+          let width = img.width;
+          let height = img.height;
+          
+          // Max dimension constraint to help with scaling down
+          const MAX_DIMENSION = 1200;
+          if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+            if (width > height) {
+              height = Math.round((height * MAX_DIMENSION) / width);
+              width = MAX_DIMENSION;
+            } else {
+              width = Math.round((width * MAX_DIMENSION) / height);
+              height = MAX_DIMENSION;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // We'll perform step-down quality compression to get under 100KB
+          let quality = 0.95;
+          let base64 = canvas.toDataURL('image/jpeg', quality);
+          let approxSize = base64.length * 0.75;
+
+          // Step down quality and scale down canvas size iteratively
+          while (approxSize > maxSizeKB * 1024 && quality > 0.1) {
+            quality -= 0.15;
+            if (quality < 0.5) {
+              width = Math.round(width * 0.85);
+              height = Math.round(height * 0.85);
+              canvas.width = width;
+              canvas.height = height;
+              ctx.drawImage(img, 0, 0, width, height);
+            }
+            base64 = canvas.toDataURL('image/jpeg', quality);
+            approxSize = base64.length * 0.75;
+          }
+
+          // Convert the base64 back into a File object for multipart form upload
+          try {
+            const arr = base64.split(',');
+            const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+            const bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) {
+              u8arr[n] = bstr.charCodeAt(n);
+            }
+
+            // Retain original filename but make sure it has .jpg extension since we compressed it
+            let name = file.name;
+            const lastDot = name.lastIndexOf('.');
+            if (lastDot !== -1) {
+              name = name.substring(0, lastDot) + '.jpg';
+            } else {
+              name += '.jpg';
+            }
+            
+            const compressedFile = new File([u8arr], name, { type: mime });
+            console.log(`[Storage] Compressed image from ${Math.round(file.size / 1024)}KB down to ${Math.round(compressedFile.size / 1024)}KB`);
+            resolve({ file: compressedFile, dataUrl: base64 });
+          } catch (e) {
+            console.error('Conversion from base64 back to File failed, falling back to original:', e);
+            resolve({ file, dataUrl: event.target?.result as string });
+          }
+        };
+        img.onerror = () => {
+          resolve({ file, dataUrl: event.target?.result as string });
+        };
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const originalFile = e.target.files?.[0];
+    if (!originalFile || !activeRoom) return;
+
+    setIsUploadingFile(true);
+    
+    try {
+      // Compress and optimize image file to under 100KB in the background
+      const { file, dataUrl } = await resizeAndCompressImage(originalFile, 100);
+
       setSelectedAttachmentFile({
         name: file.name,
         type: file.type,
-        dataUrl: reader.result as string,
+        dataUrl: dataUrl,
       });
 
-      setIsUploadingFile(true);
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('roomId', activeRoom.id);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('roomId', activeRoom.id);
 
-        const res = await fetch(`${API_URL}/api/storage/upload`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${currentUser?.accessToken}`,
-          },
-          body: formData,
-        });
+      const res = await fetch(`${API_URL}/api/storage/upload`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${currentUser?.accessToken}`,
+        },
+        body: formData,
+      });
 
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.message || 'File upload failed');
-        }
-
-        const data = await res.json();
-        setSelectedAttachmentFile((prev) => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            messageId: data.messageId,
-            attachmentId: data.attachment.id,
-          };
-        });
-      } catch (err: any) {
-        alert(`Storage Upload Error: ${err.message || 'Could not upload file to storage.'}`);
-        setSelectedAttachmentFile(null);
-      } finally {
-        setIsUploadingFile(false);
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'File upload failed');
       }
-    };
-    reader.readAsDataURL(file);
+
+      const data = await res.json();
+      setSelectedAttachmentFile((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          messageId: data.messageId,
+          attachmentId: data.attachment.id,
+        };
+      });
+
+      if (originalFile.size > 100 * 1024 && originalFile.type.startsWith('image/')) {
+        showToast(`Image optimized & uploaded successfully (${Math.round(file.size / 1024)} KB)`, 'success');
+      } else {
+        showToast('File uploaded successfully!', 'success');
+      }
+    } catch (err: any) {
+      showClinicalModal(
+        'Upload Failed',
+        `Storage Upload Error: ${err.message || 'Could not upload file to storage.'}`,
+        'error'
+      );
+      setSelectedAttachmentFile(null);
+    } finally {
+      setIsUploadingFile(false);
+    }
+
     e.target.value = '';
   };
 
@@ -892,7 +1231,11 @@ export default function ClinicalPlatform() {
     if (!messageInput.trim() && !selectedAttachmentFile) return;
 
     if (dlpBlockMessage) {
-      alert(dlpBlockMessage);
+      showClinicalModal(
+        'Data Security Warning',
+        dlpBlockMessage,
+        'warning'
+      );
       return;
     }
 
@@ -1001,7 +1344,11 @@ export default function ClinicalPlatform() {
         setActiveTab('chats');
       } else {
         const errJson = await res.json();
-        alert(`Failed to create room: ${errJson.message || 'Error occurred'}`);
+        showClinicalModal(
+          'Room Creation Failed',
+          `Failed to create room: ${errJson.message || 'Error occurred'}`,
+          'error'
+        );
       }
     } catch (err) {
       // Local fallback room push
@@ -1386,14 +1733,24 @@ export default function ClinicalPlatform() {
                 }`}
               title="Directs & Groups"
             >
-              <span className="flex items-center gap-2.5">
+              <span className="flex items-center gap-2.5 relative">
                 <MessageSquare className="h-4.5 w-4.5 shrink-0" />
+                {!isSidebarExpanded && rooms.reduce((acc, r) => acc + (r.unreadCount || 0), 0) > 0 && (
+                  <span className="absolute -top-1 -right-1 block h-2 w-2 rounded-full bg-red-500 ring-1 ring-slate-900 animate-pulse"></span>
+                )}
                 {isSidebarExpanded && <span className="truncate">Directs & Groups</span>}
               </span>
               {isSidebarExpanded && (
-                <span className="bg-teal-500/20 text-teal-400 text-xs px-2 py-0.5 rounded-full font-bold shrink-0">
-                  {rooms.length}
-                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="bg-teal-500/20 text-teal-400 text-xs px-2 py-0.5 rounded-full font-bold">
+                    {rooms.length}
+                  </span>
+                  {rooms.reduce((acc, r) => acc + (r.unreadCount || 0), 0) > 0 && (
+                    <span className="bg-red-500 text-white text-[10px] font-bold h-5 min-w-[20px] px-1.5 rounded-full flex items-center justify-center animate-pulse">
+                      {rooms.reduce((acc, r) => acc + (r.unreadCount || 0), 0)}
+                    </span>
+                  )}
+                </div>
               )}
             </button>
 
@@ -1517,35 +1874,104 @@ export default function ClinicalPlatform() {
               <div className="px-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Active Chats</div>
               {rooms
                 .filter((r) => r.type !== 'PATIENT_CONTEXT' && r.name.toLowerCase().includes(chatSearchQuery.toLowerCase()))
-                .map((room) => (
-                  <button
-                    key={room.id}
-                    onClick={() => setActiveRoom(room)}
-                    onContextMenu={(e) => {
-                      if (room.type !== 'DIRECT') {
+                .sort((a, b) => {
+                  // 1. Sort by unread messages first (unreadCount > 0)
+                  const aHasUnread = (a.unreadCount && a.unreadCount > 0) ? 1 : 0;
+                  const bHasUnread = (b.unreadCount && b.unreadCount > 0) ? 1 : 0;
+                  if (aHasUnread !== bHasUnread) {
+                    return bHasUnread - aHasUnread; // Sort unread to the top
+                  }
+
+                  // 2. Sort by pinned state next
+                  const aPinned = pinnedRoomIds.includes(a.id) ? 1 : 0;
+                  const bPinned = pinnedRoomIds.includes(b.id) ? 1 : 0;
+                  if (aPinned !== bPinned) {
+                    return bPinned - aPinned; // Sort pinned below unread, but above regular
+                  }
+
+                  return 0;
+                })
+                .map((room) => {
+                  const isPinned = pinnedRoomIds.includes(room.id);
+                  const isDirect = room.type === 'DIRECT';
+                  return (
+                    <button
+                      key={room.id}
+                      onClick={() => setActiveRoom(room)}
+                      onContextMenu={(e) => {
                         e.preventDefault();
                         setContextMenu({
                           x: e.clientX,
                           y: e.clientY,
                           room: room,
                         });
-                      }
-                    }}
-                    className={`w-full text-left p-3 rounded-xl transition-all border ${activeRoom?.id === room.id
-                      ? 'bg-slate-800 border-slate-700/80 text-white shadow-md'
-                      : 'border-transparent text-slate-400 hover:bg-slate-800/30 hover:text-slate-200'
+                      }}
+                      className={`w-full text-left p-3 rounded-xl transition-all border flex gap-3 items-center ${
+                        activeRoom?.id === room.id
+                          ? isDirect
+                            ? 'bg-slate-800/90 border-emerald-500/35 text-white shadow-md shadow-emerald-950/20'
+                            : 'bg-slate-800/90 border-sky-500/35 text-white shadow-md shadow-sky-950/20'
+                          : room.unreadCount && room.unreadCount > 0
+                            ? 'bg-slate-800/20 border-slate-850 text-slate-100 font-extrabold shadow-sm'
+                            : 'border-transparent text-slate-400 hover:bg-slate-800/30 hover:text-slate-200'
                       }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="font-semibold text-xs truncate flex items-center gap-2">
-                        <span className={`h-2.5 w-2.5 rounded-full ${room.type === 'DIRECT' ? 'bg-emerald-500 shadow-emerald-500/50 shadow-sm' : 'bg-teal-500 shadow-teal-500/50 shadow-sm'}`} />
-                        {room.name}
+                    >
+                      {/* Left Icon Block */}
+                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border relative transition-all duration-300 ${
+                        activeRoom?.id === room.id
+                          ? isDirect
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                            : 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                          : isDirect
+                            ? 'bg-slate-800/90 text-emerald-400 border-slate-700/60'
+                            : 'bg-slate-800/90 text-sky-400 border-slate-700/60'
+                      }`}>
+                        {isDirect ? <User className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+                        {/* Status notification dot */}
+                        {room.unreadCount && room.unreadCount > 0 && (
+                          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 animate-ping" />
+                        )}
                       </div>
-                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">{room.type}</span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 truncate mt-1">Tap to enter clinical stream...</p>
-                  </button>
-                ))}
+
+                      {/* Content block */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className={`text-xs font-semibold truncate flex items-center gap-1.5 ${
+                            room.unreadCount && room.unreadCount > 0 ? 'text-white font-extrabold' : ''
+                          }`}>
+                            {isPinned && <Pin className="h-3 w-3 text-amber-400 rotate-45 shrink-0 inline-block" />}
+                            <span className="truncate">{room.name}</span>
+                          </span>
+
+                          {room.unreadCount && room.unreadCount > 0 ? (
+                            <span className="bg-red-500 text-white text-[9px] font-bold h-4 min-w-[16px] px-1.5 rounded-full flex items-center justify-center animate-pulse shrink-0">
+                              {room.unreadCount}
+                            </span>
+                          ) : isDirect ? (
+                            <span className="px-1.5 py-0.5 rounded text-[8px] font-black tracking-wide uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+                              Direct
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded text-[8px] font-black tracking-wide uppercase bg-sky-500/10 text-sky-400 border border-sky-500/20 shrink-0">
+                              Group
+                            </span>
+                          )}
+                        </div>
+                        <p className={`text-[10px] truncate mt-0.5 ${
+                          room.unreadCount && room.unreadCount > 0 ? 'text-teal-400 font-bold' : 'text-slate-500'
+                        }`}>
+                          {room.unreadCount && room.unreadCount > 0
+                            ? '⚠️ Unread secure updates...'
+                            : isPinned
+                              ? '📌 Pinned to top of dashboard'
+                              : isDirect
+                                ? 'Private doctor-to-staff clinical line'
+                                : 'Coordinated care team discussions'}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
             </>
           )}
 
@@ -2185,6 +2611,29 @@ export default function ClinicalPlatform() {
                 </div>
 
                 <div className="relative z-10 space-y-1">
+                  {/* Premium "Load Earlier Messages" Button by Senior UX Designer */}
+                  {hasMoreMessages && (
+                    <div className="flex justify-center pb-4 pt-1">
+                      <button
+                        onClick={handleLoadMoreMessages}
+                        disabled={isLoadingMore}
+                        className="bg-slate-900/60 hover:bg-slate-800/80 text-teal-400 hover:text-teal-300 disabled:opacity-40 border border-slate-800/80 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-2 active:scale-95 shadow-md backdrop-blur-sm cursor-pointer"
+                      >
+                        {isLoadingMore ? (
+                          <>
+                            <Clock className="h-3 w-3 animate-spin text-teal-400" />
+                            <span>Retrieving clinical logs...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Clock className="h-3 w-3 text-teal-400" />
+                            <span>Load earlier records</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
                   {messages.map((msg, index) => {
                     const isMe = msg.sender.id === currentUser?.id;
                     const isPrevSame = index > 0 && messages[index - 1].sender.id === msg.sender.id;
@@ -2658,20 +3107,46 @@ export default function ClinicalPlatform() {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="px-3 py-1.5 border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-            Group Settings: {contextMenu.room.name.substring(0, 15)}...
+            Group Settings: {contextMenu.room.name ? contextMenu.room.name.substring(0, 15) : 'Direct Chat'}...
           </div>
 
           <button
             onClick={() => {
-              setInviteTargetRoom(contextMenu.room);
-              setShowInviteModal(true);
+              togglePinRoom(contextMenu.room.id);
               setContextMenu(null);
             }}
             className="w-full text-left px-3 py-2 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition-all"
           >
-            <UserPlus className="h-4 w-4 text-teal-400" />
-            <span>Invite Clinical Staff</span>
+            <Pin className="h-4 w-4 text-amber-400 rotate-45" />
+            <span>{pinnedRoomIds.includes(contextMenu.room.id) ? 'Unpin Chat' : 'Pin to Top'}</span>
           </button>
+
+          {contextMenu.room.type === 'DIRECT' && (
+            <button
+              onClick={() => {
+                handleClearChatHistory(contextMenu.room.id);
+                setContextMenu(null);
+              }}
+              className="w-full text-left px-3 py-2 hover:bg-red-950/40 hover:text-red-400 flex items-center gap-2 transition-all text-rose-500/80"
+            >
+              <Trash2 className="h-4 w-4 text-rose-400" />
+              <span>Clear Chat History</span>
+            </button>
+          )}
+
+          {contextMenu.room.type !== 'DIRECT' && (
+            <button
+              onClick={() => {
+                setInviteTargetRoom(contextMenu.room);
+                setShowInviteModal(true);
+                setContextMenu(null);
+              }}
+              className="w-full text-left px-3 py-2 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition-all"
+            >
+              <UserPlus className="h-4 w-4 text-teal-400" />
+              <span>Invite Clinical Staff</span>
+            </button>
+          )}
 
           <button
             onClick={() => {
@@ -2695,16 +3170,18 @@ export default function ClinicalPlatform() {
             <span>Close Menu</span>
           </button>
 
-          <button
-            onClick={() => {
-              handleLeaveRoom(contextMenu.room);
-              setContextMenu(null);
-            }}
-            className="w-full text-left px-3 py-2 hover:bg-red-950/50 hover:text-red-400 flex items-center gap-2 transition-all text-red-500/80 rounded-b-xl"
-          >
-            <LogOut className="h-4 w-4" />
-            <span>Leave Group</span>
-          </button>
+          {contextMenu.room.type !== 'DIRECT' && (
+            <button
+              onClick={() => {
+                handleLeaveRoom(contextMenu.room);
+                setContextMenu(null);
+              }}
+              className="w-full text-left px-3 py-2 hover:bg-red-950/50 hover:text-red-400 flex items-center gap-2 transition-all text-red-500/80 rounded-b-xl"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Leave Group</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -3092,6 +3569,91 @@ export default function ClinicalPlatform() {
             {toast.type === 'error' && <AlertTriangle className="h-4 w-4 shrink-0" />}
             {toast.type === 'info' && <Info className="h-4 w-4 shrink-0" />}
             <span className="text-xs font-bold whitespace-nowrap">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* --- UNIFIED CLINICAL MODAL DIALOG --- */}
+      {clinicalModal.isOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          <div className={`w-full max-w-sm rounded-2xl border bg-slate-900/90 shadow-2xl p-6 relative overflow-hidden transition-all transform duration-300 scale-100 flex flex-col items-center text-center ${
+            clinicalModal.type === 'error'
+              ? 'border-red-500/30 shadow-red-950/20'
+              : clinicalModal.type === 'warning'
+                ? 'border-amber-500/30 shadow-amber-950/20'
+                : 'border-teal-500/30 shadow-teal-950/20'
+          }`}>
+            {/* Glowing top gradient */}
+            <div className={`absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r ${
+              clinicalModal.type === 'error'
+                ? 'from-red-500 via-rose-500 to-red-600'
+                : clinicalModal.type === 'warning'
+                  ? 'from-amber-500 via-orange-400 to-amber-600'
+                  : 'from-teal-500 via-emerald-450 to-sky-500'
+            }`} />
+
+            {/* Glowing Icon Container */}
+            <div className={`h-12 w-12 rounded-full flex items-center justify-center mb-4 border relative ${
+              clinicalModal.type === 'error'
+                ? 'bg-red-500/10 text-red-400 border-red-500/20 shadow-lg shadow-red-900/25'
+                : clinicalModal.type === 'warning'
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-lg shadow-amber-900/25'
+                  : 'bg-teal-500/10 text-teal-400 border-teal-500/20 shadow-lg shadow-teal-900/25'
+            }`}>
+              {clinicalModal.type === 'error' && <AlertTriangle className="h-5 w-5 animate-pulse" />}
+              {clinicalModal.type === 'warning' && <Lock className="h-5 w-5 animate-bounce" />}
+              {clinicalModal.type === 'confirm' && <Shield className="h-5 w-5" />}
+              {clinicalModal.type === 'success' && <CheckCircle className="h-5 w-5" />}
+              {clinicalModal.type === 'info' && <Info className="h-5 w-5" />}
+            </div>
+
+            {/* Text details */}
+            <h3 className={`text-sm font-bold mb-2 tracking-wide uppercase ${
+              clinicalModal.type === 'error'
+                ? 'text-red-400'
+                : clinicalModal.type === 'warning'
+                  ? 'text-amber-400'
+                  : 'text-teal-400'
+            }`}>
+              {clinicalModal.title}
+            </h3>
+            
+            <p className="text-[11px] text-slate-350 leading-relaxed mb-6 whitespace-pre-wrap max-w-[280px]">
+              {clinicalModal.message}
+            </p>
+
+            {/* Actions button block */}
+            <div className="flex w-full gap-3 items-center justify-center">
+              {clinicalModal.type === 'confirm' ? (
+                <>
+                  <button
+                    onClick={clinicalModal.onCancel}
+                    className="flex-1 py-2 rounded-xl border border-slate-700 bg-slate-800/40 text-slate-300 hover:bg-slate-800 hover:text-white transition-all text-[10px] font-bold uppercase tracking-wider"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={clinicalModal.onConfirm}
+                    className="flex-1 py-2 rounded-xl text-white transition-all text-[10px] font-bold uppercase tracking-wider shadow-lg bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 shadow-teal-950/20"
+                  >
+                    Confirm
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={clinicalModal.onConfirm}
+                  className={`w-full py-2 rounded-xl text-white transition-all text-[10px] font-bold uppercase tracking-wider shadow-lg ${
+                    clinicalModal.type === 'error'
+                      ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500'
+                      : clinicalModal.type === 'warning'
+                        ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700'
+                        : 'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700'
+                  }`}
+                >
+                  Acknowledge
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

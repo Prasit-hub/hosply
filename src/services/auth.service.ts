@@ -1,6 +1,7 @@
 import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcrypt';
 import { prisma } from '../lib/db';
+import { encrypt, decrypt } from '../common/utils/crypto';
 
 export class AuthService {
   private readonly jwtSecret = (process.env.JWT_SECRET && process.env.JWT_SECRET !== 'undefined' && process.env.JWT_SECRET !== 'null')
@@ -79,7 +80,8 @@ export class AuthService {
       }
 
       // 3. Seed users
-      const passwordHash = await bcrypt.hash('Hosply@Secure2026', 10);
+      const defaultPasswordHash = await bcrypt.hash('Hosply@Secure2026', 10);
+      const adminPasswordHash = await bcrypt.hash('password123', 10);
 
       const usersToSeed = [
         { username: 'doctor1', firstName: 'สมชาย', lastName: 'รักดี', professionalId: 'MD-998877', roleId: doctorRole.id },
@@ -91,17 +93,24 @@ export class AuthService {
       ];
 
       for (const u of usersToSeed) {
+        const hash = u.username === 'admin1' ? adminPasswordHash : defaultPasswordHash;
         const exists = await prisma.user.findUnique({ where: { username: u.username } });
         if (!exists) {
           await prisma.user.create({
             data: {
               username: u.username,
-              passwordHash,
-              firstName: u.firstName,
-              lastName: u.lastName,
+              passwordHash: hash,
+              firstName: encrypt(u.firstName),
+              lastName: encrypt(u.lastName),
               professionalId: u.professionalId,
               roleId: u.roleId,
             },
+          });
+        } else {
+          // Sync password if user already exists
+          await prisma.user.update({
+            where: { id: exists.id },
+            data: { passwordHash: hash },
           });
         }
       }
@@ -149,8 +158,8 @@ export class AuthService {
       user: {
         id: user.id,
         username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        firstName: decrypt(user.firstName),
+        lastName: decrypt(user.lastName),
         role: user.role.name,
       },
     };

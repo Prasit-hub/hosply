@@ -71,6 +71,7 @@ model RoomMember {
   joinedAt   DateTime @default(now())
   lastReadAt DateTime @default(now())
   role       String   @default("MEMBER") // 'ADMIN', 'MEMBER'
+  clearedAt  DateTime? // Timestamp when this user cleared their room history
 
   room       ChatRoom @relation(fields: [roomId], references: [id])
   user       User     @relation(fields: [userId], references: [id])
