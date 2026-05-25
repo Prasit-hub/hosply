@@ -5,7 +5,7 @@ import { decrypt } from '@/common/utils/crypto';
 const rawJwtSecret = process.env.JWT_SECRET;
 const JWT_SECRET = (rawJwtSecret && rawJwtSecret !== 'undefined' && rawJwtSecret !== 'null')
   ? rawJwtSecret
-  : 'hosply_super_secret_jwt_key_2026_clinical_collaboration';
+  : '761d04cd-6464-4cb8-a9c7-865827c4a691';
 
 export interface AuthenticatedUser {
   id: string;

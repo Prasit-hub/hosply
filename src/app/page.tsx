@@ -41,6 +41,52 @@ import {
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
+// --- Client-side End-to-End Cryptography Helpers (Model B) ---
+async function getCryptoKey(roomId: string): Promise<CryptoKey> {
+  const enc = new TextEncoder();
+  const rawKey = enc.encode(roomId);
+  const hash = await window.crypto.subtle.digest('SHA-256', rawKey);
+  return await window.crypto.subtle.importKey(
+    'raw',
+    hash,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptFileClient(file: File, roomId: string): Promise<File> {
+  const key = await getCryptoKey(roomId);
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const fileBuffer = await file.arrayBuffer();
+  
+  const ciphertext = await window.crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv },
+    key,
+    fileBuffer
+  );
+  
+  const merged = new Uint8Array(12 + ciphertext.byteLength);
+  merged.set(iv, 0);
+  merged.set(new Uint8Array(ciphertext), 12);
+  
+  return new File([merged], file.name + '.enc', { type: 'application/octet-stream' });
+}
+
+async function decryptFileClient(encryptedArrayBuffer: ArrayBuffer, roomId: string): Promise<ArrayBuffer> {
+  const key = await getCryptoKey(roomId);
+  const iv = new Uint8Array(encryptedArrayBuffer.slice(0, 12));
+  const ciphertext = encryptedArrayBuffer.slice(12);
+  
+  const decrypted = await window.crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: iv },
+    key,
+    ciphertext
+  );
+  
+  return decrypted;
+}
+
 // types
 interface UserSession {
   id: string;
@@ -102,6 +148,163 @@ interface AuditLog {
   };
 }
 
+const translations = {
+  EN: {
+    // Login
+    loginTitle: 'Hosply Clinical Network',
+    loginSubtitle: 'Secure AES-256 at-rest message gateway for healthcare teams.',
+    usernameLabel: 'Hospital Staff Username',
+    usernamePlaceholder: 'doctor1 / nurse1 / pharmacist1 / admin1',
+    passwordLabel: 'Secure Password',
+    passwordPlaceholder: '••••••••',
+    loginButton: 'Authenticate & Access',
+    authenticating: 'Decrypting Credentials...',
+    languageLabel: 'Select Language',
+    
+    // Sidebar Tabs
+    tabChats: 'Chats',
+    tabDirectory: 'Directory',
+    tabAdmin: 'Admin Panel',
+    tabSettings: 'Settings',
+    
+    // Sidebar Lists
+    activeChatsTitle: 'Active Chats',
+    directoryTitle: 'Active Staff Directory',
+    searchPlaceholder: 'Search chat or group...',
+    newGroupButton: 'New Group Chat',
+    inviteMemberButton: 'Invite Staff',
+    
+    // Chat Header
+    directLineLabel: 'Private doctor-to-staff clinical line',
+    groupLineLabel: 'Coordinated care team discussions',
+    patientContextLabel: 'Patient-centric discussion stream',
+    classificationLabel: 'CLASSIFICATION',
+    hnLabel: 'HN',
+    anLabel: 'AN',
+    statusLabel: 'STATUS',
+    
+    // Message input
+    messagePlaceholder: 'Type a secure clinical message...',
+    dlpWarning: '⚠️ SECURE DATA PROTOCOL DETECTED - MESSAGE PROTECTED',
+    sendButton: 'Send',
+    classificationInternal: 'INTERNAL',
+    classificationConfidential: 'CONFIDENTIAL',
+    classificationRestricted: 'RESTRICTED',
+    
+    // Context Menu
+    pinToTop: 'Pin to Top',
+    unpinChat: 'Unpin Chat',
+    clearHistory: 'Clear Chat History',
+    leaveGroup: 'Leave Group',
+    inviteStaff: 'Invite Staff to Group',
+    
+    // Profile Settings
+    profileTitle: 'Professional Profile Settings',
+    roleLabel: 'Professional Clinical Role',
+    usernameLabelSettings: 'Clinical Staff Username',
+    resetPasswordTitle: 'Security Passcode Reset',
+    currentPasswordLabel: 'Current Security Passcode',
+    newPasswordLabel: 'New Security Passcode',
+    confirmPasswordLabel: 'Confirm New Passcode',
+    passcodeResetting: 'Resetting security credentials...',
+    passcodeResetButton: 'Update Security Passcode',
+    logoutButton: 'Terminate Session & Logout',
+    
+    // Admin Panel
+    adminTitle: 'Clinical Directory Administration',
+    createStaffButton: 'Provision Staff Account',
+    tableUsername: 'Username',
+    tableFullName: 'Full Name',
+    tableRole: 'Role',
+    tableActions: 'Actions',
+    editAction: 'Modify Settings',
+    auditTitle: 'HIPAA Access & Audit Activity Logs',
+    exportAuditButton: 'Export SECURE CSV Report',
+    
+    // Clinical mod
+    acknowledgeButton: 'Acknowledge',
+    confirmButton: 'Confirm',
+    cancelButton: 'Cancel'
+  },
+  TH: {
+    // Login
+    loginTitle: 'เครือข่ายคลินิก Hosply',
+    loginSubtitle: 'ช่องทางส่งข้อความเข้ารหัสปลอดภัย AES-256 สำหรับทีมแพทย์และพยาบาล',
+    usernameLabel: 'ชื่อผู้ใช้งานระบบสุขภาพ',
+    usernamePlaceholder: 'doctor1 / nurse1 / pharmacist1 / admin1',
+    passwordLabel: 'รหัสผ่านความปลอดภัย',
+    passwordPlaceholder: '••••••••',
+    loginButton: 'ยืนยันตัวตนและเข้าใช้งาน',
+    authenticating: 'กำลังตรวจสอบสิทธิ์...',
+    languageLabel: 'เลือกภาษา',
+    
+    // Sidebar Tabs
+    tabChats: 'ห้องสนทนา',
+    tabDirectory: 'รายชื่อบุคลากร',
+    tabAdmin: 'ผู้ดูแลระบบ',
+    tabSettings: 'ตั้งค่าระบบ',
+    
+    // Sidebar Lists
+    activeChatsTitle: 'การสนทนาปัจจุบัน',
+    directoryTitle: 'รายชื่อบุคลากรที่ปฏิบัติหน้าที่',
+    searchPlaceholder: 'ค้นหาห้องสนทนาหรือกลุ่ม...',
+    newGroupButton: 'สร้างกลุ่มแชทใหม่',
+    inviteMemberButton: 'เชิญบุคลากร',
+    
+    // Chat Header
+    directLineLabel: 'สายตรงส่วนตัวสำหรับการแพทย์',
+    groupLineLabel: 'ห้องหารือร่วมกันของทีมดูแลผู้ป่วย',
+    patientContextLabel: 'ช่องทางสนทนาเจาะจงเฉพาะรายผู้ป่วย',
+    classificationLabel: 'ระดับชั้นความลับ',
+    hnLabel: 'เลขผู้ป่วยทั่วไป (HN)',
+    anLabel: 'เลขรับผู้ป่วยใน (AN)',
+    statusLabel: 'สถานะ',
+    
+    // Message input
+    messagePlaceholder: 'พิมพ์ข้อความทางคลินิกที่ปลอดภัย...',
+    dlpWarning: '⚠️ ตรวจพบข้อมูลลับเฉพาะทางแพทย์ - ข้อความอยู่ภายใต้โปรโตคอลความปลอดภัย',
+    sendButton: 'ส่ง',
+    classificationInternal: 'ข้อความทั่วไปในคลินิก',
+    classificationConfidential: 'ข้อมูลผู้ป่วยเป็นความลับ',
+    classificationRestricted: 'ข้อมูลลับควบคุมพิเศษ (PHI)',
+    
+    // Context Menu
+    pinToTop: 'ปักหมุดไว้บนสุด',
+    unpinChat: 'เลิกปักหมุด',
+    clearHistory: 'ล้างประวัติการสนทนา',
+    leaveGroup: 'ออกจากกลุ่มแชท',
+    inviteStaff: 'เชิญบุคลากรเข้ากลุ่ม',
+    
+    // Profile Settings
+    profileTitle: 'ตั้งค่าโปรไฟล์วิชาชีพ',
+    roleLabel: 'ตำแหน่งวิชาชีพหลัก',
+    usernameLabelSettings: 'ชื่อผู้ใช้บัญชีสุขภาพ',
+    resetPasswordTitle: 'เปลี่ยนรหัสผ่านรหัสความปลอดภัย',
+    currentPasswordLabel: 'รหัสผ่านความปลอดภัยปัจจุบัน',
+    newPasswordLabel: 'รหัสผ่านความปลอดภัยใหม่',
+    confirmPasswordLabel: 'ยืนยันรหัสผ่านความปลอดภัยใหม่',
+    passcodeResetting: 'กำลังตั้งค่ารหัสความปลอดภัยใหม่...',
+    passcodeResetButton: 'อัปเดตรหัสความปลอดภัย',
+    logoutButton: 'ยกเลิกเซสชันและออกจากระบบ',
+    
+    // Admin Panel
+    adminTitle: 'ระบบจัดการรายชื่อผู้ใช้วิชาชีพคลินิก',
+    createStaffButton: 'ลงทะเบียนบัญชีบุคลากรใหม่',
+    tableUsername: 'ชื่อผู้ใช้งาน',
+    tableFullName: 'ชื่อ-นามสกุล',
+    tableRole: 'ตำแหน่งงาน',
+    tableActions: 'การจัดการ',
+    editAction: 'แก้ไขข้อมูลผู้ใช้',
+    auditTitle: 'บันทึกประวัติการตรวจสอบกิจกรรมเข้าถึงข้อมูล (HIPAA Audit)',
+    exportAuditButton: 'ส่งออกรายงานความปลอดภัย CSV',
+    
+    // Clinical mod
+    acknowledgeButton: 'รับทราบ',
+    confirmButton: 'ยืนยัน',
+    cancelButton: 'ยกเลิก'
+  }
+};
+
 export default function ClinicalPlatform() {
   // Authentication & Global State
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
@@ -145,6 +348,24 @@ export default function ClinicalPlatform() {
   const [hasMoreMessages, setHasMoreMessages] = useState<boolean>(false);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const [pinnedRoomIds, setPinnedRoomIds] = useState<string[]>([]);
+
+  // Internationalization (i18n) State
+  const [language, setLanguage] = useState<'EN' | 'TH'>('TH');
+
+  // Load language preference on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedLang = localStorage.getItem('hosply_language');
+      if (storedLang === 'EN' || storedLang === 'TH') {
+        setLanguage(storedLang);
+      }
+    }
+  }, []);
+
+  const changeLanguage = (lang: 'EN' | 'TH') => {
+    setLanguage(lang);
+    localStorage.setItem('hosply_language', lang);
+  };
 
   // Unified Custom Clinical Modal system
   const [clinicalModal, setClinicalModal] = useState<{
@@ -468,6 +689,21 @@ export default function ClinicalPlatform() {
         }
       }
 
+      // Update room list in state locally to prevent HTTP fetch race condition
+      setRooms((prevRooms) => {
+        const currentActive = activeRoomRef.current || activeRoom;
+        return prevRooms.map((r) => {
+          if (r.id === msg.roomId) {
+            const isActive = currentActive && currentActive.id === msg.roomId;
+            return {
+              ...r,
+              unreadCount: isActive ? 0 : (r.unreadCount || 0) + (isMe ? 0 : 1),
+            };
+          }
+          return r;
+        });
+      });
+
       // Append if it's the active room
       setMessages((prev) => {
         const currentActiveRoom = activeRoomRef.current;
@@ -476,8 +712,10 @@ export default function ClinicalPlatform() {
         return [...prev, msg];
       });
 
-      // Update room last reading status
-      fetchRooms();
+      // Update room last reading status in database, slightly delayed to avoid DB write/read race conditions
+      setTimeout(() => {
+        fetchRooms();
+      }, 300);
     });
 
     socket.on('roomJoined', (data: any) => {
@@ -639,15 +877,25 @@ export default function ClinicalPlatform() {
         const data = await res.json();
         setRooms(data);
 
+        // Keep current active room if it exists
+        const currentActive = activeRoomRef.current || activeRoom;
+        if (currentActive) {
+          const freshActive = data.find((r: any) => r.id === currentActive.id);
+          if (freshActive) {
+            setActiveRoom(freshActive);
+            return;
+          }
+        }
+
         const lastRoomId = localStorage.getItem('hosply_last_room_id');
         if (lastRoomId) {
           const lastRoom = data.find((r: any) => r.id === lastRoomId);
           if (lastRoom) {
             setActiveRoom(lastRoom);
-          } else if (data.length > 0 && !activeRoom) {
+          } else if (data.length > 0) {
             setActiveRoom(data[0]);
           }
-        } else if (data.length > 0 && !activeRoom) {
+        } else if (data.length > 0) {
           setActiveRoom(data[0]);
         }
       } else {
@@ -681,11 +929,21 @@ export default function ClinicalPlatform() {
       ];
       setRooms(mockRooms);
 
+      // Keep current active room if it exists
+      const currentActive = activeRoomRef.current || activeRoom;
+      if (currentActive) {
+        const freshActive = mockRooms.find((r) => r.id === currentActive.id);
+        if (freshActive) {
+          setActiveRoom(freshActive);
+          return;
+        }
+      }
+
       const lastRoomId = localStorage.getItem('hosply_last_room_id');
       const lastRoom = mockRooms.find((r) => r.id === lastRoomId);
       if (lastRoom) {
         setActiveRoom(lastRoom);
-      } else if (!activeRoom) {
+      } else {
         setActiveRoom(mockRooms[0]);
       }
     }
@@ -1091,9 +1349,15 @@ export default function ClinicalPlatform() {
         dataUrl: dataUrl,
       });
 
+      // Encrypt optimized file natively in browser before sending to Next.js storage API
+      const encryptedFile = await encryptFileClient(file, activeRoom.id);
+
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', encryptedFile);
       formData.append('roomId', activeRoom.id);
+      formData.append('originalName', file.name);
+      formData.append('originalType', file.type);
+      formData.append('originalSize', file.size.toString());
 
       const res = await fetch(`${API_URL}/api/storage/upload`, {
         method: 'POST',
@@ -1138,7 +1402,9 @@ export default function ClinicalPlatform() {
   };
 
   const handleDownloadOrOpen = async (attachment: any, classification: string, action: 'DOWNLOAD' | 'OPEN') => {
+    if (!activeRoom) return;
     try {
+      // 1. Fetch the temporary authorized download token URL
       const res = await fetch(`${API_URL}/api/storage/download-url/${attachment.id}`, {
         headers: {
           Authorization: `Bearer ${currentUser?.accessToken}`,
@@ -1148,20 +1414,36 @@ export default function ClinicalPlatform() {
         throw new Error('Unauthorized to access this clinical document');
       }
       const data = await res.json();
-      const absoluteUrl = `${API_URL}${data.url}${action === 'OPEN' ? '&inline=true' : ''}`;
+      const absoluteUrl = `${API_URL}${data.url}`;
+
+      // 2. Fetch the fully encrypted binary payload from the storage endpoint
+      const fileRes = await fetch(absoluteUrl);
+      if (!fileRes.ok) {
+        throw new Error('Failed to retrieve encrypted document');
+      }
+      const encryptedArrayBuffer = await fileRes.arrayBuffer();
+
+      // 3. Decrypt the ciphertext natively in browser memory using AES-GCM and Room ID
+      const decryptedArrayBuffer = await decryptFileClient(encryptedArrayBuffer, activeRoom.id);
+
+      // 4. Wrap decrypted buffer inside a secure sandboxed Blob and generate local URL
+      const blob = new Blob([decryptedArrayBuffer], { type: attachment.fileType });
+      const localBlobUrl = URL.createObjectURL(blob);
 
       if (action === 'DOWNLOAD') {
         const link = document.createElement('a');
-        link.href = absoluteUrl;
+        link.href = localBlobUrl;
         link.setAttribute('download', attachment.fileName);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        // Delay revoking URL to let browser complete download pipeline
+        setTimeout(() => URL.revokeObjectURL(localBlobUrl), 100);
       } else {
         setPreviewingFile({
           name: attachment.fileName,
           type: attachment.fileType,
-          dataUrl: absoluteUrl,
+          dataUrl: localBlobUrl,
           classification: classification,
         });
       }
@@ -1426,13 +1708,37 @@ export default function ClinicalPlatform() {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl animate-pulse-slow"></div>
 
         <div className="w-full max-w-md space-y-8 bg-slate-900 border border-slate-800 p-8 rounded-2xl clinical-glow relative z-10">
+          {/* Language Selector */}
+          <div className="absolute top-4 right-4 flex items-center gap-1 bg-slate-800/60 p-0.5 rounded-lg border border-slate-700/60 z-20">
+            <button
+              onClick={() => changeLanguage('TH')}
+              className={`px-2 py-1 rounded text-[10px] font-black transition-all ${
+                language === 'TH'
+                  ? 'bg-teal-500 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              TH
+            </button>
+            <button
+              onClick={() => changeLanguage('EN')}
+              className={`px-2 py-1 rounded text-[10px] font-black transition-all ${
+                language === 'EN'
+                  ? 'bg-teal-500 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              EN
+            </button>
+          </div>
+
           <div className="flex flex-col items-center justify-center">
             <div className="flex items-center justify-center h-16 w-16 rounded-2xl bg-teal-500 text-white shadow-lg glow-active">
               <Activity className="h-9 w-9 animate-pulse" />
             </div>
             <h2 className="mt-6 text-center text-3xl font-extrabold text-white tracking-tight">hosply</h2>
-            <p className="mt-2 text-center text-sm text-slate-400">
-              Clinical Collaboration & PHI Data Prevention Platform
+            <p className="mt-2 text-center text-xs text-slate-400 max-w-[280px]">
+              {translations[language].loginSubtitle}
             </p>
           </div>
 
@@ -1446,40 +1752,40 @@ export default function ClinicalPlatform() {
 
             <div className="space-y-4 rounded-md shadow-sm">
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Hospital Staff Username</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{translations[language].usernameLabel}</label>
                 <div className="mt-1 relative rounded-md">
                   <input
                     type="text"
                     required
                     value={loginUsername}
                     onChange={(e) => setLoginUsername(e.target.value)}
-                    className="block w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-3 text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 text-sm"
-                    placeholder="doctor1 / nurse1 / pharmacist1 / admin1"
+                    className="block w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-3 text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs"
+                    placeholder={translations[language].usernamePlaceholder}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider font-sans">Secure Password</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider font-sans">{translations[language].passwordLabel}</label>
                 <div className="mt-1 relative rounded-md">
                   <input
                     type="password"
                     required
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    className="block w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-3 text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 text-sm"
-                    placeholder="••••••••"
+                    className="block w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-3 text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs"
+                    placeholder={translations[language].passwordPlaceholder}
                   />
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs text-slate-400 border-t border-slate-800 pt-4">
+            <div className="flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-850 pt-4">
               <span className="flex items-center gap-1">
-                <Lock className="h-3 w-3 text-teal-400" /> AES-256 Encrypted database
+                <Lock className="h-3 w-3 text-teal-500/70" /> AES-256 Encrypted
               </span>
               <span className="flex items-center gap-1">
-                <Shield className="h-3 w-3 text-teal-400" /> HIPAA / PDPA Compliant
+                <Shield className="h-3 w-3 text-teal-500/70" /> HIPAA / PDPA
               </span>
             </div>
 
@@ -1487,9 +1793,9 @@ export default function ClinicalPlatform() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="group relative flex w-full justify-center rounded-lg bg-teal-500 py-3 px-4 text-sm font-semibold text-white hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-all active:scale-[0.98]"
+                className="group relative flex w-full justify-center rounded-lg bg-teal-500 py-3 px-4 text-xs font-semibold text-white hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-all active:scale-[0.98]"
               >
-                {isLoading ? 'Decrypting Credentials...' : 'Authenticate'}
+                {isLoading ? translations[language].authenticating : translations[language].loginButton}
               </button>
             </div>
           </form>
@@ -1712,14 +2018,41 @@ export default function ClinicalPlatform() {
               )}
             </div>
 
-            {/* Toggle Button */}
-            <button
-              onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
-              className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700/60 hidden md:block"
-              title={isSidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
-            >
-              {isSidebarExpanded ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </button>
+            <div className="flex items-center gap-2">
+              {isSidebarExpanded && (
+                <div className="flex items-center gap-1 bg-slate-800/60 p-0.5 rounded-lg border border-slate-700/60 mr-1 animate-fade-in shrink-0">
+                  <button
+                    onClick={() => changeLanguage('TH')}
+                    className={`px-1.5 py-0.5 rounded text-[8px] font-black transition-all ${
+                      language === 'TH'
+                        ? 'bg-teal-500 text-white shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    TH
+                  </button>
+                  <button
+                    onClick={() => changeLanguage('EN')}
+                    className={`px-1.5 py-0.5 rounded text-[8px] font-black transition-all ${
+                      language === 'EN'
+                        ? 'bg-teal-500 text-white shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    EN
+                  </button>
+                </div>
+              )}
+
+              {/* Toggle Button */}
+              <button
+                onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+                className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700/60 hidden md:block"
+                title={isSidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
+              >
+                {isSidebarExpanded ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
 
           {/* Active Navigation Tabs */}
@@ -1731,14 +2064,14 @@ export default function ClinicalPlatform() {
                   ? 'bg-teal-900/40 text-teal-300 font-bold border-l-2 border-teal-500'
                   : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                 }`}
-              title="Directs & Groups"
+              title={translations[language].tabChats}
             >
               <span className="flex items-center gap-2.5 relative">
                 <MessageSquare className="h-4.5 w-4.5 shrink-0" />
                 {!isSidebarExpanded && rooms.reduce((acc, r) => acc + (r.unreadCount || 0), 0) > 0 && (
                   <span className="absolute -top-1 -right-1 block h-2 w-2 rounded-full bg-red-500 ring-1 ring-slate-900 animate-pulse"></span>
                 )}
-                {isSidebarExpanded && <span className="truncate">Directs & Groups</span>}
+                {isSidebarExpanded && <span className="truncate">{translations[language].tabChats}</span>}
               </span>
               {isSidebarExpanded && (
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -1761,10 +2094,10 @@ export default function ClinicalPlatform() {
                   ? 'bg-teal-900/40 text-teal-300 font-bold border-l-2 border-teal-500'
                   : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                 }`}
-              title="Clinical Directory"
+              title={translations[language].tabDirectory}
             >
               <Users className="h-4.5 w-4.5 shrink-0" />
-              {isSidebarExpanded && <span className="truncate">Clinical Directory</span>}
+              {isSidebarExpanded && <span className="truncate">{translations[language].tabDirectory}</span>}
             </button>
 
             {currentUser.role === 'Admin' && (
@@ -1775,11 +2108,11 @@ export default function ClinicalPlatform() {
                     ? 'bg-teal-900/40 text-teal-300 font-bold border-l-2 border-teal-500'
                     : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                   }`}
-                title="Admin Dashboard"
+                title={translations[language].tabAdmin}
               >
                 <span className="flex items-center gap-2.5">
                   <Shield className="h-4.5 w-4.5 shrink-0" />
-                  {isSidebarExpanded && <span className="truncate">Admin Console</span>}
+                  {isSidebarExpanded && <span className="truncate">{translations[language].tabAdmin}</span>}
                 </span>
                 {isSidebarExpanded && (
                   <span className="bg-rose-500/20 text-rose-400 text-xs px-1.5 py-0.5 rounded font-bold animate-pulse shrink-0">
@@ -1796,10 +2129,10 @@ export default function ClinicalPlatform() {
                   ? 'bg-teal-900/40 text-teal-300 font-bold border-l-2 border-teal-500'
                   : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                 }`}
-              title="Settings & System"
+              title={translations[language].tabSettings}
             >
               <Settings className="h-4.5 w-4.5 shrink-0" />
-              {isSidebarExpanded && <span className="truncate">Settings</span>}
+              {isSidebarExpanded && <span className="truncate">{translations[language].tabSettings}</span>}
             </button>
           </div>
 
@@ -1850,7 +2183,7 @@ export default function ClinicalPlatform() {
         (activeTab === 'admin' || activeTab === 'settings')
           ? 'hidden md:hidden'
           : (activeRoom && activeTab === 'chats')
-            ? 'hidden md:flex'
+            ? 'hidden'
             : 'flex'
       }`}>
         {/* Search header */}
@@ -1860,7 +2193,7 @@ export default function ClinicalPlatform() {
               type="text"
               value={chatSearchQuery}
               onChange={(e) => setChatSearchQuery(e.target.value)}
-              placeholder="Search chat or group..."
+              placeholder={translations[language].searchPlaceholder}
               className="w-full bg-slate-800/50 border border-slate-700/60 rounded-lg py-2 pl-9 pr-4 text-xs text-white focus:outline-none focus:border-teal-500/80 placeholder-slate-400"
             />
             <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
@@ -1871,24 +2204,14 @@ export default function ClinicalPlatform() {
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {activeTab === 'chats' && (
             <>
-              <div className="px-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Active Chats</div>
+              <div className="px-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">{translations[language].activeChatsTitle}</div>
               {rooms
                 .filter((r) => r.type !== 'PATIENT_CONTEXT' && r.name.toLowerCase().includes(chatSearchQuery.toLowerCase()))
                 .sort((a, b) => {
-                  // 1. Sort by unread messages first (unreadCount > 0)
-                  const aHasUnread = (a.unreadCount && a.unreadCount > 0) ? 1 : 0;
-                  const bHasUnread = (b.unreadCount && b.unreadCount > 0) ? 1 : 0;
-                  if (aHasUnread !== bHasUnread) {
-                    return bHasUnread - aHasUnread; // Sort unread to the top
-                  }
-
-                  // 2. Sort by pinned state next
-                  const aPinned = pinnedRoomIds.includes(a.id) ? 1 : 0;
-                  const bPinned = pinnedRoomIds.includes(b.id) ? 1 : 0;
-                  if (aPinned !== bPinned) {
-                    return bPinned - aPinned; // Sort pinned below unread, but above regular
-                  }
-
+                  const aPinned = pinnedRoomIds.includes(a.id);
+                  const bPinned = pinnedRoomIds.includes(b.id);
+                  if (aPinned && !bPinned) return -1;
+                  if (!aPinned && bPinned) return 1;
                   return 0;
                 })
                 .map((room) => {
@@ -2515,13 +2838,13 @@ export default function ClinicalPlatform() {
               {/* Chat room Header */}
               <div className="h-20 px-6 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/50 backdrop-blur-md relative z-20">
                 <div className="flex items-center gap-4">
-                  {/* Mobile Back Button (LINE-style) */}
+                  {/* Back Button to Chats List */}
                   <button
                     onClick={() => setActiveRoom(null)}
-                    className="md:hidden p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 active:scale-95 transition-all mr-1"
+                    className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 hover:border-slate-600 active:scale-95 transition-all mr-1 flex items-center justify-center shadow-lg"
                     title="Back to Chats"
                   >
-                    <ArrowLeft className="h-5 w-5" />
+                    <ArrowLeft className="h-4.5 w-4.5" />
                   </button>
 
                   {/* Glowing Status Avatar Ring */}

@@ -6,10 +6,10 @@ import { encrypt, decrypt } from '../common/utils/crypto';
 export class AuthService {
   private readonly jwtSecret = (process.env.JWT_SECRET && process.env.JWT_SECRET !== 'undefined' && process.env.JWT_SECRET !== 'null')
     ? process.env.JWT_SECRET
-    : 'hosply_super_secret_jwt_key_2026_clinical_collaboration';
+    : '761d04cd-6464-4cb8-a9c7-865827c4a691';
   private readonly jwtRefreshSecret = (process.env.JWT_REFRESH_SECRET && process.env.JWT_REFRESH_SECRET !== 'undefined' && process.env.JWT_REFRESH_SECRET !== 'null')
     ? process.env.JWT_REFRESH_SECRET
-    : 'hosply_refresh_super_secret_key_2026';
+    : 'f1285f04-c39e-4949-a4f4-ba811a49d0f5';
 
   constructor() {
     // Seed initial roles and users asynchronously in background
@@ -80,20 +80,14 @@ export class AuthService {
       }
 
       // 3. Seed users
-      const defaultPasswordHash = await bcrypt.hash('Hosply@Secure2026', 10);
       const adminPasswordHash = await bcrypt.hash('password123', 10);
 
       const usersToSeed = [
-        { username: 'doctor1', firstName: 'สมชาย', lastName: 'รักดี', professionalId: 'MD-998877', roleId: doctorRole.id },
-        { username: 'nurse1', firstName: 'มาริสา', lastName: 'ดูแลดี', roleId: nurseRole.id },
-        { username: 'pharmacist1', firstName: 'วริศรา', lastName: 'รุ่งเรือง', roleId: pharmacistRole.id },
-        { username: 'lab1', firstName: 'ประเสริฐ', lastName: 'วิเคราะห์ผล', roleId: labRole.id },
-        { username: 'doctor2', firstName: 'อนันต์', lastName: 'เมธี', professionalId: 'MD-112233', roleId: doctorRole.id },
-        { username: 'admin1', firstName: 'System', lastName: 'Admin', roleId: adminRole.id },
+        { username: 'admin1', firstName: 'System', lastName: 'Admin', roleId: adminRole.id, professionalId: undefined as string | undefined },
       ];
 
       for (const u of usersToSeed) {
-        const hash = u.username === 'admin1' ? adminPasswordHash : defaultPasswordHash;
+        const hash = adminPasswordHash;
         const exists = await prisma.user.findUnique({ where: { username: u.username } });
         if (!exists) {
           await prisma.user.create({

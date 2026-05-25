@@ -12,6 +12,10 @@ export async function POST(req: Request) {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const roomId = formData.get('roomId') as string | null;
+    
+    const originalName = (formData.get('originalName') as string) || file?.name;
+    const originalType = (formData.get('originalType') as string) || file?.type;
+    const originalSize = formData.get('originalSize') ? parseInt(formData.get('originalSize') as string, 10) : file?.size;
 
     if (!file) {
       return NextResponse.json({ message: 'No file provided' }, { status: 400 });
@@ -30,9 +34,9 @@ export async function POST(req: Request) {
 
     const result = await storageService.saveUploadedFile(
       {
-        originalname: file.name,
-        mimetype: file.type,
-        size: file.size,
+        originalname: originalName!,
+        mimetype: originalType!,
+        size: originalSize!,
         buffer,
       },
       roomId,

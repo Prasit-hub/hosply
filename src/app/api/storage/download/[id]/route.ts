@@ -16,7 +16,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   try {
     const fileData = await storageService.verifyAndGetFile(attachmentId, token, ip);
-    const fileBuffer = fs.readFileSync(fileData.filePath);
+    const fileBuffer = fileData.buffer;
 
     const headers = new Headers();
     headers.set('Content-Type', fileData.fileType);
@@ -27,7 +27,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       headers.set('Content-Disposition', `attachment; filename="${encodeURIComponent(fileData.fileName)}"`);
     }
 
-    return new Response(fileBuffer, { headers });
+    return new Response(new Uint8Array(fileBuffer), { headers });
   } catch (error: any) {
     return NextResponse.json({ message: error.message || 'Failed to download file' }, { status: 403 });
   }

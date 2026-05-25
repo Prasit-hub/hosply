@@ -1,0 +1,11 @@
+.git
+.next
+node_modules
+npm-debug.log
+dev.db
+dev.db-journal
+uploads
+data
+Dockerfile
+docker-compose.yml
+.dockerignore
