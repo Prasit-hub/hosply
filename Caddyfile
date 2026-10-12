@@ -1,0 +1,15 @@
+hosply.medparkhospital.com {
+    tls /etc/caddy/certs/medpark.pem /etc/caddy/certs/medpark-decrypted.key
+ 
+    redir /pgadmin /pgadmin/
+    handle /pgadmin/* {
+        reverse_proxy pgadmin:80 {
+            header_up X-Script-Name /pgadmin
+            header_up X-Scheme {scheme}
+        }
+    }
+
+    handle {
+        reverse_proxy web:4000
+    }
+}

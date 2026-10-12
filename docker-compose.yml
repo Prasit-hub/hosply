@@ -1,55 +1,63 @@
-version: '3.8'
+name: hosply-production
 
 services:
-  # 1. Production PostgreSQL Database
-  db:
-    image: postgres:16-alpine
-    container_name: hosply-db
+  web:
+    build: .
+    container_name: hosply-prod
     restart: always
-    environment:
-      POSTGRES_USER: hosply_admin
-      POSTGRES_PASSWORD: hosply_secure_clinical_pass_2026
-      POSTGRES_DB: hosply_prod_db
-    volumes:
-      # Persistent named volume for Postgres data directory
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    # Optimized shared buffers and connections for a 1-2GB RAM VPS
-    command: postgres -c shared_buffers=256MB -c max_connections=150
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # 2. Hosply Next.js Clinical Messaging App
-  hosply:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: hosply-app
-    restart: always
-    ports:
-      - "3006:3006"
-    depends_on:
-      - db
-    volumes:
-      # Persistent named volume for uploaded clinical documents & images
-      - hosply_uploads_data:/app/uploads
     environment:
       - NODE_ENV=production
-      - PORT=3006
-      - DATABASE_URL=postgresql://hosply_admin:hosply_secure_clinical_pass_2026@db:5432/hosply_prod_db?schema=public
-      - JWT_SECRET=761d04cd-6464-4cb8-a9c7-865827c4a691
-      - JWT_REFRESH_SECRET=f1285f04-c39e-4949-a4f4-ba811a49d0f5
-      - ENCRYPTION_KEY=1bcf168e-0d56-425c-b042-7437b5edc3dd
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin-prod
+    restart: always
+    environment:
+      - SCRIPT_NAME=/pgadmin
+      - PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION=False
+    env_file:
+      - .env
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data_prod:/var/lib/pgadmin
+    depends_on:
+      - db
+  
+  db:
+    image: postgres:15-alpine
+    container_name: postgres-db-prod
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - pg_data_prod:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432" 
+
+  caddy:
+    image: caddy:alpine
+    container_name: caddy-proxy-prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./certs:/etc/caddy/certs
+      - caddy_data_prod:/data
+      - caddy_config_prod:/config
+    depends_on:
+      - db
+      - pgadmin
+      - web
 
 volumes:
-  postgres_data:
-  hosply_uploads_data:
+  pgadmin_data_prod:
+  pg_data_prod:
+  caddy_data_prod:
+  caddy_config_prod:
