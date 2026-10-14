@@ -80,14 +80,10 @@ export class AuthService {
       }
 
       // 3. Seed users
-      const defaultPasswordHash = await bcrypt.hash('password123', 10);
+      const defaultPasswordHash = await bcrypt.hash('admin1234', 10);
 
       const usersToSeed = [
-        { username: 'admin1', firstName: 'System', lastName: 'Admin', roleId: adminRole.id, professionalId: undefined as string | undefined },
         { username: 'admin', firstName: 'System', lastName: 'Admin', roleId: adminRole.id, professionalId: undefined as string | undefined },
-        { username: 'doctor1', firstName: 'สมชาย', lastName: 'รักดี', roleId: doctorRole.id, professionalId: 'MD-998877' },
-        { username: 'nurse1', firstName: 'มาริสา', lastName: 'ดูแลดี', roleId: nurseRole.id, professionalId: undefined as string | undefined },
-        { username: 'pharmacist1', firstName: 'วริศรา', lastName: 'รุ่งเรือง', roleId: pharmacistRole.id, professionalId: undefined as string | undefined },
       ];
 
       for (const u of usersToSeed) {

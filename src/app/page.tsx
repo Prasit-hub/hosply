@@ -420,8 +420,8 @@ export default function ClinicalPlatform() {
 
   // Authentication & Registration States
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [loginUsername, setLoginUsername] = useState('doctor1');
-  const [loginPassword, setLoginPassword] = useState('Hosply@Secure2026');
+  const [loginUsername, setLoginUsername] = useState('admin');
+  const [loginPassword, setLoginPassword] = useState('admin1234');
   const [loginError, setLoginError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
