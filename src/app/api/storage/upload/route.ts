@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { verifyJwtAndGetUser } from '@/lib/auth';
 import { storageService } from '@/services/storage.service';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
 export async function POST(req: Request) {
   const user = await verifyJwtAndGetUser(req);
   if (!user) {

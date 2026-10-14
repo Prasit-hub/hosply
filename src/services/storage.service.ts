@@ -14,7 +14,9 @@ export interface UploadedFileDto {
 }
 
 export class StorageService {
-  private readonly uploadDir = path.join(process.cwd(), 'uploads');
+  private readonly uploadDir = process.env.VERCEL
+    ? path.join('/tmp', 'uploads')
+    : path.join(process.cwd(), 'uploads');
   private readonly activeTokens = new Map<string, { userId: string; attachmentId: string; expiresAt: Date }>();
   private blobServiceClient: BlobServiceClient | null = null;
   private containerName: string = '';
@@ -25,19 +27,28 @@ export class StorageService {
     this.containerName = process.env.AZURE_STORAGE_CONTAINER_NAME || 'hosply-attachments';
     
     if (this.connectionString) {
-      this.blobServiceClient = BlobServiceClient.fromConnectionString(this.connectionString);
-      const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
-      containerClient.createIfNotExists().catch((err: any) => {
-        console.error('[Storage] Failed to initialize Azure Container:', err.message);
-      });
+      try {
+        this.blobServiceClient = BlobServiceClient.fromConnectionString(this.connectionString);
+        const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
+        containerClient.createIfNotExists().catch((err: any) => {
+          console.error('[Storage] Failed to initialize Azure Container:', err.message);
+        });
+      } catch (e: any) {
+        console.warn('[Storage] Azure initialization skipped:', e.message);
+      }
     }
 
-    if (!fs.existsSync(this.uploadDir)) {
-      fs.mkdirSync(this.uploadDir, { recursive: true });
-    }
-    const avatarDir = path.join(this.uploadDir, 'avatars');
-    if (!fs.existsSync(avatarDir)) {
-      fs.mkdirSync(avatarDir, { recursive: true });
+    try {
+      if (!fs.existsSync(this.uploadDir)) {
+        fs.mkdirSync(this.uploadDir, { recursive: true });
+      }
+      const avatarDir = path.join(this.uploadDir, 'avatars');
+      if (!fs.existsSync(avatarDir)) {
+        fs.mkdirSync(avatarDir, { recursive: true });
+      }
+    } catch (fsErr: any) {
+      // On Vercel / serverless platforms, root directory may be read-only
+      console.warn('[Storage] Local uploads directory creation skipped (read-only filesystem):', fsErr.message);
     }
   }
 
@@ -83,14 +94,16 @@ export class StorageService {
         // If the store is private, browser <img> tags cannot access the private Vercel URL directly (returns 403 Forbidden).
         // Therefore, we cache locally as /api/uploads/avatars/... while keeping the photo safely backed up in Vercel Blob.
         if (isPrivate) {
+          // In private stores, browsers cannot directly load the private URL without credentials.
+          // Since user photos are strictly <= 10KB, base64 Data URL renders instantly and works on Vercel without local disk dependency.
           this.saveLocalUserPhoto(file.buffer, pathname);
-          avatarUrl = `/api/uploads/avatars/${path.basename(pathname)}`;
+          avatarUrl = `data:${file.mimetype || 'image/jpeg'};base64,${file.buffer.toString('base64')}`;
         } else {
           avatarUrl = blob.url;
         }
-        console.log(`[StorageService] Photo uploaded to Vercel Blob: ${blob.url} (avatarUrl: ${avatarUrl})`);
+        console.log(`[StorageService] Photo uploaded to Vercel Blob: ${blob.url} (avatarUrl set)`);
       } catch (err: any) {
-        console.error('[StorageService] Vercel Blob photo upload failed, falling back to local storage:', err.message);
+        console.error('[StorageService] Vercel Blob photo upload failed, falling back to local/data storage:', err.message);
         avatarUrl = this.saveLocalUserPhoto(file.buffer, pathname);
       }
     } else {
@@ -144,14 +157,22 @@ export class StorageService {
   }
 
   private saveLocalUserPhoto(buffer: Buffer, relativePathname: string): string {
-    const avatarDir = path.join(this.uploadDir, 'avatars');
-    if (!fs.existsSync(avatarDir)) {
-      fs.mkdirSync(avatarDir, { recursive: true });
-    }
     const filename = path.basename(relativePathname);
-    const filePath = path.join(avatarDir, filename);
-    fs.writeFileSync(filePath, buffer);
-    return `/api/uploads/avatars/${filename}`;
+    try {
+      const avatarDir = path.join(this.uploadDir, 'avatars');
+      if (!fs.existsSync(avatarDir)) {
+        fs.mkdirSync(avatarDir, { recursive: true });
+      }
+      const filePath = path.join(avatarDir, filename);
+      fs.writeFileSync(filePath, buffer);
+      return `/api/uploads/avatars/${filename}`;
+    } catch (e: any) {
+      // In serverless read-only environments where local write fails, return base64 data URI (<= 10KB photo)
+      const base64 = buffer.toString('base64');
+      const ext = path.extname(filename).toLowerCase();
+      const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+      return `data:${mime};base64,${base64}`;
+    }
   }
 
   // Pre-signed download url simulation
@@ -311,10 +332,17 @@ export class StorageService {
         storageKey = blob.url;
         console.log(`[StorageService] Chat attachment uploaded to Vercel Blob: ${blob.url}`);
       } catch (blobErr: any) {
-        console.error('[StorageService] Vercel Blob attachment upload failed, falling back to disk:', blobErr.message);
-        const filePath = path.join(this.uploadDir, filename);
-        fs.writeFileSync(filePath, bufferToSave);
-        storageKey = filename;
+        console.error('[StorageService] Vercel Blob attachment upload failed:', blobErr.message);
+        if (process.env.VERCEL) {
+          throw new Error(`Vercel Blob upload failed: ${blobErr.message}`);
+        }
+        try {
+          const filePath = path.join(this.uploadDir, filename);
+          fs.writeFileSync(filePath, bufferToSave);
+          storageKey = filename;
+        } catch (fsErr: any) {
+          throw new Error(`Upload failed: ${blobErr.message}`);
+        }
       }
     } else if (this.connectionString && this.blobServiceClient) {
       // 2. Azure Storage Blob
@@ -326,6 +354,9 @@ export class StorageService {
       storageKey = filename;
     } else {
       // 3. Local disk fallback
+      if (process.env.VERCEL) {
+        throw new Error('BLOB_READ_WRITE_TOKEN is missing in Vercel project environment variables. Please add BLOB_READ_WRITE_TOKEN in your Vercel Project Settings > Environment Variables.');
+      }
       const filePath = path.join(this.uploadDir, filename);
       fs.writeFileSync(filePath, bufferToSave);
       storageKey = filename;

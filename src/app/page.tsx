@@ -1826,9 +1826,16 @@ export default function ClinicalPlatform() {
           } else if (res.status === 401) {
             errMsg = 'Your session has expired. Please sign in again.';
           } else if (res.status === 413) {
-            errMsg = 'File size exceeds server upload limit.';
+            errMsg = 'File size exceeds server upload limit (max 4.5MB on Vercel Serverless).';
           } else {
-            errMsg = `Upload failed with server status ${res.status}`;
+            const text = await res.text();
+            if (text && text.length < 200 && !text.includes('<!DOCTYPE')) {
+              errMsg = text;
+            } else if (res.status === 500) {
+              errMsg = 'Vercel Server error (500). Please ensure BLOB_READ_WRITE_TOKEN is added in Vercel Project Settings > Environment Variables.';
+            } else {
+              errMsg = `Upload failed with server status ${res.status}`;
+            }
           }
         } catch {
           errMsg = `Upload failed with server status ${res.status}`;
