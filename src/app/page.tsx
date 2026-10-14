@@ -37,7 +37,8 @@ import {
   Info,
   X,
   Pin,
-  Trash2
+  Trash2,
+  LogIn
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
@@ -224,7 +225,45 @@ const translations = {
     // Clinical mod
     acknowledgeButton: 'Acknowledge',
     confirmButton: 'Confirm',
-    cancelButton: 'Cancel'
+    cancelButton: 'Cancel',
+    
+    // Additional UI elements
+    chatButton: 'Chat',
+    nowConnected: 'Connected',
+    loadEarlier: 'Load earlier records',
+    loadingEarlier: 'Retrieving clinical logs...',
+    typingSuffix: 'is typing a secure message...',
+    classificationSelectLabel: 'Classification Level:',
+    classificationHelpText: 'RESTRICTED level blocks non-authorized roles.',
+    emptyChatSelection: 'Select a conversation or clinical room to start communicating securely.',
+    copyLink: 'Copy Secure Link',
+    closeMenu: 'Close Menu',
+    allMembersAdded: 'All available staff members are already in this room.',
+    roomLabel: 'Room:',
+    searchStaffPlaceholder: 'Search staff by name or role...',
+    addMembersBtn: 'Add to Group',
+    newRoomModalTitle: 'Launch Clinical Discussion Room',
+    newRoomTitleLabel: 'Discussion Room Title',
+    newRoomTitlePlaceholder: 'e.g. ER Shift Group, ICU Cardiology Intake',
+    cancelBtn: 'Cancel',
+    initRoomBtn: 'Initialize Room',
+    directChatPrefix: '👤 1-1 Direct Message',
+    patientChatPrefix: '🏥 Clinical Patient Discussion',
+    groupChatPrefix: '👥 Group Case discussion',
+
+    // Registration
+    tabLogin: 'Sign In',
+    tabRegister: 'Create Account',
+    firstNameLabel: 'First Name',
+    lastNameLabel: 'Last Name',
+    professionalIdLabel: 'Staff / License ID (Optional)',
+    registerButton: 'Register & Access',
+    registering: 'Creating Secure Account...',
+    defaultRoleNotice: 'Default Role: General Staff (Normal User)',
+    alreadyHaveAccount: 'Already have an account?',
+    noAccountYet: "Don't have an account?",
+    switchToLogin: 'Sign in here',
+    switchToRegister: 'Register here'
   },
   TH: {
     // Login
@@ -237,6 +276,20 @@ const translations = {
     loginButton: 'ยืนยันตัวตนและเข้าใช้งาน',
     authenticating: 'กำลังตรวจสอบสิทธิ์...',
     languageLabel: 'เลือกภาษา',
+    
+    // Registration
+    tabLogin: 'เข้าสู่ระบบ',
+    tabRegister: 'ลงทะเบียนผู้ใช้ใหม่',
+    firstNameLabel: 'ชื่อจริง',
+    lastNameLabel: 'นามสกุล',
+    professionalIdLabel: 'รหัสพนักงาน / เลขที่วิชาชีพ (ถ้ามี)',
+    registerButton: 'ลงทะเบียนและเข้าใช้งาน',
+    registering: 'กำลังสร้างบัญชีผู้ใช้งาน...',
+    defaultRoleNotice: 'สิทธิ์การใช้งานเริ่มต้น: เจ้าหน้าที่ทั่วไป (Normal User)',
+    alreadyHaveAccount: 'มีบัญชีผู้ใช้งานอยู่แล้ว?',
+    noAccountYet: 'ยังไม่มีบัญชีผู้ใช้งาน?',
+    switchToLogin: 'เข้าสู่ระบบที่นี่',
+    switchToRegister: 'ลงทะเบียนที่นี่',
     
     // Sidebar Tabs
     tabChats: 'ห้องสนทนา',
@@ -301,7 +354,46 @@ const translations = {
     // Clinical mod
     acknowledgeButton: 'รับทราบ',
     confirmButton: 'ยืนยัน',
-    cancelButton: 'ยกเลิก'
+    cancelButton: 'ยกเลิก',
+
+    // Additional UI elements
+    chatButton: 'ส่งข้อความ',
+    nowConnected: 'เชื่อมต่อแล้ว',
+    loadEarlier: 'โหลดข้อความก่อนหน้า',
+    loadingEarlier: 'กำลังดึงประวัติการสนทนา...',
+    typingSuffix: 'กำลังพิมพ์ข้อความ...',
+    classificationSelectLabel: 'ระดับชั้นความลับ:',
+    classificationHelpText: 'ระดับ RESTRICTED จำกัดเฉพาะผู้มีสิทธิ์เข้าถึงเท่านั้น',
+    emptyChatSelection: 'เลือกห้องสนทนาหรือทีมคลินิกเพื่อเริ่มสื่อสารอย่างปลอดภัย',
+    copyLink: 'คัดลอกลิงก์ห้องสนทนา',
+    closeMenu: 'ปิดเมนู',
+    allMembersAdded: 'บุคลากรทั้งหมดเข้าร่วมห้องนี้เรียบร้อยแล้ว',
+    roomLabel: 'ห้องสนทนา:',
+    searchStaffPlaceholder: 'ค้นหาบุคลากรตามชื่อหรือตำแหน่ง...',
+    addMembersBtn: 'เพิ่มเข้ากลุ่ม',
+    newRoomModalTitle: 'สร้างห้องสนทนาการแพทย์ใหม่',
+    newRoomTitleLabel: 'ชื่อห้องสนทนา / กลุ่มเคส',
+    newRoomTitlePlaceholder: 'เช่น ทีมเวรฉุกเฉิน ER, ทีมแพทย์โรคหัวใจ ICU',
+    cancelBtn: 'ยกเลิก',
+    initRoomBtn: 'สร้างห้องสนทนา',
+    directChatPrefix: '👤 ข้อความส่วนตัว (1-1)',
+    patientChatPrefix: '🏥 ช่องทางเคสผู้ป่วย',
+    groupChatPrefix: '👥 ปรึกษาเคสกลุ่ม'
+  }
+};
+
+const getRoleLabel = (role: any, lang: 'TH' | 'EN') => {
+  const roleName = typeof role === 'object' && role !== null ? role.name : (role || '');
+  if (lang !== 'TH') return roleName;
+  switch (roleName) {
+    case 'Admin': return 'ผู้ดูแลระบบ';
+    case 'Doctor': return 'แพทย์';
+    case 'Nurse': return 'พยาบาล';
+    case 'Pharmacist': return 'เภสัชกร';
+    case 'Lab Staff': return 'นักเทคนิคการแพทย์';
+    case 'Radiology Staff': return 'รังสีเทคนิค';
+    case 'Staff': return 'เจ้าหน้าที่';
+    default: return roleName;
   }
 };
 
@@ -326,11 +418,21 @@ export default function ClinicalPlatform() {
 
   const [activeTab, setActiveTab] = useState<'chats' | 'patients' | 'directory' | 'admin' | 'settings'>('chats');
 
-  // Login Page States
+  // Authentication & Registration States
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [loginUsername, setLoginUsername] = useState('doctor1');
   const [loginPassword, setLoginPassword] = useState('Hosply@Secure2026');
   const [loginError, setLoginError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Registration Form States
+  const [regUsername, setRegUsername] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regFirstName, setRegFirstName] = useState('');
+  const [regLastName, setRegLastName] = useState('');
+  const [regProfessionalId, setRegProfessionalId] = useState('');
+  const [regError, setRegError] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
 
   // Password Reset States
   const [currentPasswordInput, setCurrentPasswordInput] = useState('');
@@ -435,6 +537,7 @@ export default function ClinicalPlatform() {
 
   const activeRoomRef = useRef<ChatRoom | null>(null);
   const roomsRef = useRef<ChatRoom[]>([]);
+  const currentUserRef = useRef<UserSession | null>(null);
 
   useEffect(() => {
     activeRoomRef.current = activeRoom;
@@ -444,12 +547,30 @@ export default function ClinicalPlatform() {
     roomsRef.current = rooms;
   }, [rooms]);
 
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
   // Save active room ID to localStorage
   useEffect(() => {
     if (activeRoom?.id) {
       localStorage.setItem('hosply_last_room_id', activeRoom.id);
     }
-  }, [activeRoom]);
+  }, [activeRoom?.id]);
+
+  // Close active chat room when switching to other menus/tabs
+  useEffect(() => {
+    if (activeTab !== 'chats') {
+      setActiveRoom(null);
+    }
+  }, [activeTab]);
+
+  const hasInitialRoomLoadedRef = useRef<boolean>(false);
+
+  const handleTabChange = (tab: 'chats' | 'patients' | 'directory' | 'admin' | 'settings') => {
+    setActiveTab(tab);
+    setActiveRoom(null);
+  };
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState('');
   const [selectedClassification, setSelectedClassification] = useState<'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED'>('INTERNAL');
@@ -664,6 +785,11 @@ export default function ClinicalPlatform() {
 
     socket.on('connect', () => {
       console.log('Realtime WS Connected');
+      const curRoomId = activeRoomRef.current?.id;
+      if (curRoomId) {
+        socket.emit('joinRoom', { roomId: curRoomId });
+        socket.emit('readRoom', { roomId: curRoomId });
+      }
     });
 
     socket.on('newMessage', (msg: Message) => {
@@ -735,6 +861,32 @@ export default function ClinicalPlatform() {
       fetchRooms();
     });
 
+    socket.on('userReadRoom', (data: { userId: string; roomId: string; lastReadAt: string }) => {
+      setActiveRoom((prev) => {
+        if (!prev || prev.id !== data.roomId) return prev;
+        const updatedMembers = (prev.members || []).map((m: any) => {
+          if (m.userId === data.userId || m.user?.id === data.userId) {
+            return { ...m, lastReadAt: data.lastReadAt };
+          }
+          return m;
+        });
+        return { ...prev, members: updatedMembers };
+      });
+
+      setRooms((prevRooms) =>
+        prevRooms.map((r) => {
+          if (r.id !== data.roomId) return r;
+          const updatedMembers = (r.members || []).map((m: any) => {
+            if (m.userId === data.userId || m.user?.id === data.userId) {
+              return { ...m, lastReadAt: data.lastReadAt };
+            }
+            return m;
+          });
+          return { ...r, members: updatedMembers };
+        })
+      );
+    });
+
     socket.on('userTyping', (data: any) => {
       if (data.isTyping) {
         setTypingUsers((prev) => {
@@ -755,9 +907,11 @@ export default function ClinicalPlatform() {
     };
   }, [currentUser]);
 
+  const activeRoomId = activeRoom?.id;
+
   // Handle active room switch
   useEffect(() => {
-    if (!activeRoom || !socketRef.current) return;
+    if (!activeRoomId) return;
 
     setMessages([]);
     setTypingUsers([]);
@@ -765,17 +919,19 @@ export default function ClinicalPlatform() {
     // Instantly clear the unread count for this room locally in rooms list state for zero-latency UX feel!
     setRooms((prevRooms) =>
       prevRooms.map((r) =>
-        r.id === activeRoom.id ? { ...r, unreadCount: 0 } : r
+        r.id === activeRoomId ? { ...r, unreadCount: 0 } : r
       )
     );
 
     // Subscribe to Socket Room and mark as read on server to update database record
-    socketRef.current.emit('joinRoom', { roomId: activeRoom.id });
-    socketRef.current.emit('readRoom', { roomId: activeRoom.id });
+    if (socketRef.current) {
+      socketRef.current.emit('joinRoom', { roomId: activeRoomId });
+      socketRef.current.emit('readRoom', { roomId: activeRoomId });
+    }
 
     // Fetch message history REST
-    fetchMessages(activeRoom.id);
-  }, [activeRoom]);
+    fetchMessages(activeRoomId);
+  }, [activeRoomId]);
 
   // --- API CALLS ---
   const handleLogin = async (e: React.FormEvent) => {
@@ -811,11 +967,66 @@ export default function ClinicalPlatform() {
     }
   };
 
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRegError('');
+
+    if (regPassword.length < 6) {
+      setRegError(language === 'TH' ? 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร' : 'Password must be at least 6 characters long');
+      return;
+    }
+
+    setIsRegistering(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: regUsername.trim(),
+          password: regPassword,
+          firstName: regFirstName.trim(),
+          lastName: regLastName.trim(),
+          professionalId: regProfessionalId.trim() || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || (language === 'TH' ? 'การลงทะเบียนไม่สำเร็จ' : 'Registration failed'));
+      }
+
+      showToast(
+        language === 'TH'
+          ? `ยินดีต้อนรับคุณ ${data.user.firstName}! บัญชีผู้ใช้ถูกสร้างเรียบร้อยแล้ว`
+          : `Welcome ${data.user.firstName}! Account created successfully.`,
+        'success'
+      );
+
+      // Auto-login with issued access token
+      setCurrentUser({
+        id: data.user.id,
+        username: data.user.username,
+        firstName: data.user.firstName,
+        lastName: data.user.lastName,
+        role: data.user.role,
+        accessToken: data.accessToken,
+      });
+    } catch (err: any) {
+      console.error('Registration failed:', err);
+      setRegError(err.message || (language === 'TH' ? 'การลงทะเบียนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' : 'Registration failed. Please try again.'));
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
   const handleLogout = () => {
     setCurrentUser(null);
     setRooms([]);
     setActiveRoom(null);
     setMessages([]);
+    hasInitialRoomLoadedRef.current = false;
     socketRef.current?.disconnect();
   };
 
@@ -887,16 +1098,20 @@ export default function ClinicalPlatform() {
           }
         }
 
-        const lastRoomId = localStorage.getItem('hosply_last_room_id');
-        if (lastRoomId) {
-          const lastRoom = data.find((r: any) => r.id === lastRoomId);
-          if (lastRoom) {
-            setActiveRoom(lastRoom);
-          } else if (data.length > 0) {
+        // Only auto-select on initial load if user hasn't explicitly closed it and is on chats tab
+        if (!hasInitialRoomLoadedRef.current && activeTab === 'chats') {
+          hasInitialRoomLoadedRef.current = true;
+          const lastRoomId = localStorage.getItem('hosply_last_room_id');
+          if (lastRoomId) {
+            const lastRoom = data.find((r: any) => r.id === lastRoomId);
+            if (lastRoom) {
+              setActiveRoom(lastRoom);
+              return;
+            }
+          }
+          if (data.length > 0) {
             setActiveRoom(data[0]);
           }
-        } else if (data.length > 0) {
-          setActiveRoom(data[0]);
         }
       } else {
         throw new Error();
@@ -939,12 +1154,15 @@ export default function ClinicalPlatform() {
         }
       }
 
-      const lastRoomId = localStorage.getItem('hosply_last_room_id');
-      const lastRoom = mockRooms.find((r) => r.id === lastRoomId);
-      if (lastRoom) {
-        setActiveRoom(lastRoom);
-      } else {
-        setActiveRoom(mockRooms[0]);
+      if (!hasInitialRoomLoadedRef.current && activeTab === 'chats') {
+        hasInitialRoomLoadedRef.current = true;
+        const lastRoomId = localStorage.getItem('hosply_last_room_id');
+        const lastRoom = mockRooms.find((r) => r.id === lastRoomId);
+        if (lastRoom) {
+          setActiveRoom(lastRoom);
+        } else if (mockRooms.length > 0) {
+          setActiveRoom(mockRooms[0]);
+        }
       }
     }
   };
@@ -964,8 +1182,11 @@ export default function ClinicalPlatform() {
         setHasMoreMessages(false);
       }
 
+      const token = currentUserRef.current?.accessToken || currentUser?.accessToken;
+      if (!token) return;
+
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${currentUser?.accessToken}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res.ok) {
@@ -1742,63 +1963,223 @@ export default function ClinicalPlatform() {
             </p>
           </div>
 
-          <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-            {loginError && (
-              <div className="bg-red-950/30 border border-red-500/50 text-red-300 rounded-lg p-3 text-sm flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
-                <span>{loginError}</span>
-              </div>
-            )}
+          {/* Auth Mode Switcher */}
+          <div className="flex bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 mt-6">
+            <button
+              type="button"
+              onClick={() => { setAuthMode('login'); setLoginError(''); setRegError(''); }}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                authMode === 'login'
+                  ? 'bg-teal-500 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <LogIn className="h-3.5 w-3.5" />
+              <span>{translations[language].tabLogin}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setAuthMode('register'); setLoginError(''); setRegError(''); }}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                authMode === 'register'
+                  ? 'bg-teal-500 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              <span>{translations[language].tabRegister}</span>
+            </button>
+          </div>
 
-            <div className="space-y-4 rounded-md shadow-sm">
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{translations[language].usernameLabel}</label>
-                <div className="mt-1 relative rounded-md">
-                  <input
-                    type="text"
-                    required
-                    value={loginUsername}
-                    onChange={(e) => setLoginUsername(e.target.value)}
-                    className="block w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-3 text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs"
-                    placeholder={translations[language].usernamePlaceholder}
-                  />
+          {authMode === 'login' ? (
+            <form className="mt-6 space-y-5" onSubmit={handleLogin}>
+              {loginError && (
+                <div className="bg-red-950/30 border border-red-500/50 text-red-300 rounded-lg p-3 text-xs flex items-center gap-2 animate-shake">
+                  <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              <div className="space-y-4 rounded-md shadow-sm">
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{translations[language].usernameLabel}</label>
+                  <div className="mt-1 relative rounded-md">
+                    <input
+                      type="text"
+                      required
+                      value={loginUsername}
+                      onChange={(e) => setLoginUsername(e.target.value)}
+                      className="block w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-3 text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs"
+                      placeholder={translations[language].usernamePlaceholder}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider font-sans">{translations[language].passwordLabel}</label>
+                  <div className="mt-1 relative rounded-md">
+                    <input
+                      type="password"
+                      required
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="block w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-3 text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs"
+                      placeholder={translations[language].passwordPlaceholder}
+                    />
+                  </div>
                 </div>
               </div>
 
+              <div className="flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-800 pt-3">
+                <span className="flex items-center gap-1">
+                  <Lock className="h-3 w-3 text-teal-500/70" /> AES-256 Encrypted
+                </span>
+                <span className="flex items-center gap-1">
+                  <Shield className="h-3 w-3 text-teal-500/70" /> HIPAA / PDPA
+                </span>
+              </div>
+
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider font-sans">{translations[language].passwordLabel}</label>
-                <div className="mt-1 relative rounded-md">
-                  <input
-                    type="password"
-                    required
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="block w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-3 text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs"
-                    placeholder={translations[language].passwordPlaceholder}
-                  />
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="group relative flex w-full justify-center rounded-lg bg-teal-500 py-3 px-4 text-xs font-semibold text-white hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-all active:scale-[0.98] shadow-md shadow-teal-500/10 cursor-pointer disabled:opacity-50"
+                >
+                  {isLoading ? translations[language].authenticating : translations[language].loginButton}
+                </button>
+              </div>
+
+              <div className="text-center text-xs text-slate-400 pt-2 border-t border-slate-800/80">
+                <span>{translations[language].noAccountYet} </span>
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('register'); setLoginError(''); setRegError(''); }}
+                  className="text-teal-400 hover:text-teal-300 font-bold underline transition-colors cursor-pointer ml-1"
+                >
+                  {translations[language].switchToRegister}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form className="mt-6 space-y-4" onSubmit={handleRegister}>
+              {regError && (
+                <div className="bg-red-950/30 border border-red-500/50 text-red-300 rounded-lg p-3 text-xs flex items-center gap-2 animate-shake">
+                  <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
+                  <span>{regError}</span>
+                </div>
+              )}
+
+              {/* Default Role Notification Banner */}
+              <div className="flex items-center gap-2 bg-teal-950/40 border border-teal-800/50 px-3 py-2 rounded-lg text-teal-300 text-[11px] font-bold">
+                <UserCheck className="h-4 w-4 text-teal-400 shrink-0" />
+                <span>{translations[language].defaultRoleNotice}</span>
+              </div>
+
+              <div className="space-y-3 rounded-md shadow-sm">
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{translations[language].usernameLabel} *</label>
+                  <div className="mt-1 relative rounded-md">
+                    <input
+                      type="text"
+                      required
+                      value={regUsername}
+                      onChange={(e) => setRegUsername(e.target.value)}
+                      className="block w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-2.5 text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs"
+                      placeholder="e.g. staff_john, nurse_sarah"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{translations[language].firstNameLabel} *</label>
+                    <div className="mt-1 relative rounded-md">
+                      <input
+                        type="text"
+                        required
+                        value={regFirstName}
+                        onChange={(e) => setRegFirstName(e.target.value)}
+                        className="block w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-2.5 text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs"
+                        placeholder={language === 'TH' ? 'สมชาย' : 'Somchai'}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{translations[language].lastNameLabel} *</label>
+                    <div className="mt-1 relative rounded-md">
+                      <input
+                        type="text"
+                        required
+                        value={regLastName}
+                        onChange={(e) => setRegLastName(e.target.value)}
+                        className="block w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-2.5 text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs"
+                        placeholder={language === 'TH' ? 'ใจดี' : 'Jaidee'}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{translations[language].passwordLabel} *</label>
+                  <div className="mt-1 relative rounded-md">
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      className="block w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-2.5 text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs"
+                      placeholder="•••••••• (min. 6 chars)"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider font-sans">{translations[language].professionalIdLabel}</label>
+                  <div className="mt-1 relative rounded-md">
+                    <input
+                      type="text"
+                      value={regProfessionalId}
+                      onChange={(e) => setRegProfessionalId(e.target.value)}
+                      className="block w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-2.5 text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs"
+                      placeholder={language === 'TH' ? 'เช่น STF-10294, RN-2026' : 'e.g. STF-10294, RN-2026'}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-850 pt-4">
-              <span className="flex items-center gap-1">
-                <Lock className="h-3 w-3 text-teal-500/70" /> AES-256 Encrypted
-              </span>
-              <span className="flex items-center gap-1">
-                <Shield className="h-3 w-3 text-teal-500/70" /> HIPAA / PDPA
-              </span>
-            </div>
+              <div className="flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-800 pt-3">
+                <span className="flex items-center gap-1">
+                  <Lock className="h-3 w-3 text-teal-500/70" /> AES-256 Protected
+                </span>
+                <span className="flex items-center gap-1">
+                  <Shield className="h-3 w-3 text-teal-500/70" /> HIPAA / PDPA Compliant
+                </span>
+              </div>
 
-            <div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="group relative flex w-full justify-center rounded-lg bg-teal-500 py-3 px-4 text-xs font-semibold text-white hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-all active:scale-[0.98]"
-              >
-                {isLoading ? translations[language].authenticating : translations[language].loginButton}
-              </button>
-            </div>
-          </form>
+              <div>
+                <button
+                  type="submit"
+                  disabled={isRegistering}
+                  className="group relative flex w-full justify-center rounded-lg bg-teal-500 py-3 px-4 text-xs font-semibold text-white hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-all active:scale-[0.98] shadow-md shadow-teal-500/10 cursor-pointer disabled:opacity-50"
+                >
+                  {isRegistering ? translations[language].registering : translations[language].registerButton}
+                </button>
+              </div>
+
+              <div className="text-center text-xs text-slate-400 pt-2 border-t border-slate-800/80">
+                <span>{translations[language].alreadyHaveAccount} </span>
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('login'); setLoginError(''); setRegError(''); }}
+                  className="text-teal-400 hover:text-teal-300 font-bold underline transition-colors cursor-pointer ml-1"
+                >
+                  {translations[language].switchToLogin}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     );
@@ -1808,8 +2189,8 @@ export default function ClinicalPlatform() {
     <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 font-sans">
       <style>{`
         :root {
-          --accent-color: ${currentTheme === 'teal' ? '#06C755' : currentTheme === 'navy' ? '#3b82f6' : currentTheme === 'emerald' ? '#10b981' : '#0ea5e9'};
-          --accent-hover: ${currentTheme === 'teal' ? '#05b34c' : currentTheme === 'navy' ? '#2563eb' : currentTheme === 'emerald' ? '#059669' : '#0284c7'};
+          --accent-color: ${currentTheme === 'teal' ? '#06C755' : currentTheme === 'navy' ? '#3b82f6' : currentTheme === 'emerald' ? '#10b981' : '#0284c7'};
+          --accent-hover: ${currentTheme === 'teal' ? '#05b34c' : currentTheme === 'navy' ? '#2563eb' : currentTheme === 'emerald' ? '#059669' : '#0369a1'};
         }
         .bg-teal-500 {
           background-color: var(--accent-color) !important;
@@ -1821,28 +2202,28 @@ export default function ClinicalPlatform() {
           color: var(--accent-color) !important;
         }
         .bg-teal-900\\/40 {
-          background-color: ${currentTheme === 'teal' ? 'rgba(6, 199, 85, 0.15)' : currentTheme === 'navy' ? 'rgba(59, 130, 246, 0.15)' : currentTheme === 'emerald' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(14, 165, 233, 0.15)'} !important;
+          background-color: ${currentTheme === 'teal' ? 'rgba(6, 199, 85, 0.15)' : currentTheme === 'navy' ? 'rgba(59, 130, 246, 0.15)' : currentTheme === 'emerald' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(2, 132, 199, 0.12)'} !important;
         }
         .text-teal-300 {
-          color: ${currentTheme === 'teal' ? '#8dfab6' : currentTheme === 'navy' ? '#93c5fd' : currentTheme === 'emerald' ? '#6ee7b7' : '#7dd3fc'} !important;
+          color: ${currentTheme === 'teal' ? '#8dfab6' : currentTheme === 'navy' ? '#93c5fd' : currentTheme === 'emerald' ? '#6ee7b7' : '#0369a1'} !important;
         }
         .border-teal-500 {
           border-color: var(--accent-color) !important;
         }
         .bg-teal-500\\/20 {
-          background-color: ${currentTheme === 'teal' ? 'rgba(6, 199, 85, 0.2)' : currentTheme === 'navy' ? 'rgba(59, 130, 246, 0.2)' : currentTheme === 'emerald' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(14, 165, 233, 0.2)'} !important;
+          background-color: ${currentTheme === 'teal' ? 'rgba(6, 199, 85, 0.2)' : currentTheme === 'navy' ? 'rgba(59, 130, 246, 0.2)' : currentTheme === 'emerald' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(2, 132, 199, 0.2)'} !important;
         }
         .bg-teal-500\\/10 {
-          background-color: ${currentTheme === 'teal' ? 'rgba(6, 199, 85, 0.1)' : currentTheme === 'navy' ? 'rgba(59, 130, 246, 0.1)' : currentTheme === 'emerald' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(14, 165, 233, 0.1)'} !important;
+          background-color: ${currentTheme === 'teal' ? 'rgba(6, 199, 85, 0.1)' : currentTheme === 'navy' ? 'rgba(59, 130, 246, 0.1)' : currentTheme === 'emerald' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(2, 132, 199, 0.1)'} !important;
         }
         .border-teal-500\\/30 {
-          border-color: ${currentTheme === 'teal' ? 'rgba(6, 199, 85, 0.3)' : currentTheme === 'navy' ? 'rgba(59, 130, 246, 0.3)' : currentTheme === 'emerald' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(14, 165, 233, 0.3)'} !important;
+          border-color: ${currentTheme === 'teal' ? 'rgba(6, 199, 85, 0.3)' : currentTheme === 'navy' ? 'rgba(59, 130, 246, 0.3)' : currentTheme === 'emerald' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(2, 132, 199, 0.3)'} !important;
         }
         .focus\\:border-teal-500:focus {
           border-color: var(--accent-color) !important;
         }
         .glow-active {
-          box-shadow: 0 0 15px ${currentTheme === 'teal' ? 'rgba(6, 199, 85, 0.3)' : currentTheme === 'navy' ? 'rgba(59, 130, 246, 0.3)' : currentTheme === 'emerald' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(14, 165, 233, 0.3)'} !important;
+          box-shadow: 0 0 15px ${currentTheme === 'teal' ? 'rgba(6, 199, 85, 0.3)' : currentTheme === 'navy' ? 'rgba(59, 130, 246, 0.3)' : currentTheme === 'emerald' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(2, 132, 199, 0.3)'} !important;
         }
 
         /* Custom speech bubbles matching Line Chat theme */
@@ -1858,95 +2239,161 @@ export default function ClinicalPlatform() {
         }
         
         ${currentTheme === 'light' ? `
-          /* Soothing Light Mode Overrides to Reduce Glare & Screen Fatigue */
+          /* --- LINE Sky Blue (Light Theme) Refined System Design --- */
+
+          /* 1. Canvas & Panels: Clean light neutral backdrop */
           .bg-slate-950 {
-            background-color: #bac9df !important; /* Iconic LINE Chat Calming Blue! */
+            background-color: #f0f4f8 !important; /* Soft, refreshing clinical canvas */
           }
           .bg-slate-900 {
-            background-color: #f4f6f9 !important; /* Softer clinical off-white */
+            background-color: #ffffff !important; /* Pure white sidebars, top headers & cards */
           }
-          .bg-slate-900\\/40, .bg-slate-900\\/50, .bg-slate-900\\/60, .bg-slate-900\\/30 {
-            background-color: #e6e9ef !important; /* Smooth sub-bars */
+          .bg-slate-900\\/60, .bg-slate-900\\/50, .bg-slate-900\\/40, .bg-slate-900\\/30 {
+            background-color: #f8fafc !important; /* Crisp sub-bars & secondary panels */
           }
-          .bg-slate-800, .bg-slate-800\\/30, .bg-slate-800\\/50 {
-            background-color: #dbe1eb !important; /* Muted accents */
+          .bg-slate-800, .bg-slate-800\\/50, .bg-slate-800\\/40, .bg-slate-800\\/30, .bg-slate-800\\/20 {
+            background-color: #f1f5f9 !important; /* Soft neutral card accents */
           }
-          .border-slate-800, .border-slate-800\\/80, .border-slate-700\\/60, .border-slate-700\\/80 {
-            border-color: rgba(15, 23, 42, 0.12) !important;
+          .bg-slate-800\\/90 {
+            background-color: #e0f2fe !important; /* Soft Sky-100 highlight for active chat room */
+            border-color: #0284c7 !important;
           }
-          .text-slate-100, .text-white, .text-slate-200, .text-slate-300 {
-            color: #1e293b !important; /* Extremely high contrast but soft dark slate text */
+          .bg-slate-800\\/90 p, .bg-slate-800\\/90 span, .bg-slate-800\\/90 div {
+            color: #0369a1 !important;
+          }
+
+          /* 2. Borders & Separators */
+          .border-slate-800, .border-slate-800\\/80, .border-slate-800\\/60,
+          .border-slate-700, .border-slate-700\\/60, .border-slate-700\\/80, .border-slate-850 {
+            border-color: #e2e8f0 !important;
+          }
+
+          /* 3. Typography & High-Contrast Readability */
+          .text-slate-100, .text-slate-200, .text-slate-300 {
+            color: #0f172a !important; /* High-contrast dark slate text */
           }
           .text-slate-400, .text-slate-500 {
-            color: #475569 !important; /* Highly readable slate-600 */
+            color: #64748b !important; /* Accessible muted slate text */
           }
-          input, select, textarea {
-            background-color: #fdfdfd !important;
-            color: #0f172a !important;
-            border-color: #a8b2c1 !important; /* Stronger gray border */
-          }
-          .text-teal-400 {
-            color: #06C755 !important; /* LINE Green in light mode */
-          }
-          .text-teal-300 {
-            color: #05b34c !important;
-          }
-          
-          /* Prevent dark text blending inside containers */
-          .bg-slate-900\\/50 p, .bg-slate-900\\/50 span {
+          /* Headings and card labels */
+          h1.text-white, h2.text-white, h3.text-white, h4.text-white,
+          p.text-white, span.text-white:not([class*="bg-"]):not([class*="badge"]), div.text-white:not([class*="bg-"]) {
             color: #0f172a !important;
           }
 
-          /* Iconic LINE Chat speech bubbles */
+          /* 4. Action Buttons & Badges: Preserve Crisp Pure White Text */
+          button.bg-teal-500, button.bg-teal-500 *,
+          .bg-teal-500, .bg-teal-500 *,
+          .bg-red-500, .bg-red-500 *,
+          .bg-rose-500, .bg-rose-500 *,
+          .bg-emerald-500, .bg-emerald-500 *,
+          .bg-sky-500, .bg-sky-500 *,
+          .bg-blue-600, .bg-blue-600 *,
+          button.bg-slate-800, button.bg-slate-800 * {
+            color: #ffffff !important;
+          }
+          button.bg-slate-800 {
+            background-color: #0284c7 !important;
+            border-color: #0284c7 !important;
+          }
+          button.bg-slate-800:hover {
+            background-color: #0369a1 !important;
+          }
+
+          /* 5. Inputs, Selects & Forms */
+          input, select, textarea {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
+          }
+          input::placeholder, textarea::placeholder {
+            color: #94a3b8 !important;
+          }
+
+          /* 6. Theme Accent Colors (Sky Blue Harmony) */
+          .text-teal-400 {
+            color: #0284c7 !important;
+          }
+          .text-teal-300 {
+            color: #0369a1 !important;
+          }
+          .bg-teal-900\\/40 {
+            background-color: rgba(2, 132, 199, 0.12) !important;
+          }
+          .border-teal-500 {
+            border-color: #0284c7 !important;
+          }
+
+          /* 7. Authentic LINE Chat Speech Bubbles */
           .self-bubble {
-            background-color: #8ee66d !important; /* LINE Chat iconic light-green self bubble */
-            border-color: #83d463 !important;
-            color: #000000 !important;
+            background-color: #9de67e !important; /* Signature LINE light lime bubble */
+            border: 1px solid #84d863 !important;
+            color: #0f172a !important;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08) !important;
           }
           .self-bubble p, .self-bubble span, .self-bubble div {
-            color: #000000 !important;
+            color: #0f172a !important;
           }
           .other-bubble {
-            background-color: #ffffff !important; /* LINE Chat iconic white bubble */
-            border-color: #e2e8f0 !important;
+            background-color: #ffffff !important; /* Crisp white other bubble */
+            border: 1px solid #e2e8f0 !important;
             color: #0f172a !important;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08) !important;
           }
           .other-bubble p, .other-bubble span, .other-bubble div {
             color: #0f172a !important;
           }
 
-          /* Senior UX Designed High-Contrast Speech Bubbles for Clinical Readability */
-          .bg-rose-50, .dark\\:bg-rose-950\\/20 {
-            background-color: #fff1f2 !important; /* soft rose-100 */
-            color: #9f1239 !important; /* rose-800 text */
+          /* 8. Bubble Tails */
+          .self-bubble-tail::after {
+            border-right: 1px solid #84d863;
+            border-top: 1px solid #84d863;
+          }
+          .other-bubble-tail::before {
+            border-left: 1px solid #e2e8f0;
+            border-top: 1px solid #e2e8f0;
+          }
+
+          /* 9. Read Badge & Timestamps */
+          .line-read-badge {
+            color: #1e3a8a !important; /* High-contrast navy text on sky blue canvas */
+          }
+
+          /* 10. Clinical Security & PHI Alerts */
+          .bg-rose-50, .dark\\:bg-rose-950\\/20, .dark\\:bg-rose-950\\/30 {
+            background-color: #ffe4e6 !important;
+            color: #9f1239 !important;
             border-color: #f43f5e !important;
           }
           .bg-rose-50 p, .bg-rose-50 span, .dark\\:bg-rose-950\\/20 p, .dark\\:bg-rose-950\\/20 span {
             color: #9f1239 !important;
           }
-          .bg-amber-50, .dark\\:bg-amber-950\\/20 {
-            background-color: #fef3c7 !important; /* soft amber-100 */
-            color: #92400e !important; /* amber-800 text */
+          .bg-amber-50, .dark\\:bg-amber-950\\/20, .dark\\:bg-amber-950\\/30 {
+            background-color: #fef3c7 !important;
+            color: #92400e !important;
             border-color: #f59e0b !important;
           }
           .bg-amber-50 p, .bg-amber-50 span, .dark\\:bg-amber-950\\/20 p, .dark\\:bg-amber-950\\/20 span {
             color: #92400e !important;
           }
-          .bg-emerald-50, .dark\\:bg-emerald-950\\/20 {
-            background-color: #d1fae5 !important; /* soft emerald-100 */
-            color: #065f46 !important; /* emerald-800 text */
+          .bg-emerald-50, .dark\\:bg-emerald-950\\/20, .dark\\:bg-emerald-950\\/30 {
+            background-color: #d1fae5 !important;
+            color: #065f46 !important;
             border-color: #10b981 !important;
           }
           .bg-emerald-50 p, .bg-emerald-50 span, .dark\\:bg-emerald-950\\/20 p, .dark\\:bg-emerald-950\\/20 span {
             color: #065f46 !important;
           }
-          .bg-slate-50, .dark\\:bg-slate-800\\/40 {
-            background-color: #f1f5f9 !important; /* soft slate-100 */
-            color: #1e293b !important; /* slate-800 text */
-            border-color: #94a3b8 !important;
+
+          /* 11. Modals & Context Menus */
+          .fixed.z-50.bg-slate-900, .bg-slate-900.clinical-glow {
+            background-color: #ffffff !important;
+            border-color: #e2e8f0 !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
           }
-          .bg-slate-50 p, .bg-slate-50 span, .dark\\:bg-slate-800\\/40 p, .dark\\:bg-slate-800\\/40 span {
-            color: #1e293b !important;
+          .fixed.z-50.bg-slate-900 button:hover {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
           }
         ` : `
           .bg-slate-950 {
@@ -1960,9 +2407,9 @@ export default function ClinicalPlatform() {
           }
         `}
         
-        /* LINE Chat aesthetics by Senior UX Designer */
+        /* LINE Chat aesthetics: authentic calming sky blue for chat room canvas */
         .line-chat-bg {
-          background-color: ${currentTheme === 'light' ? '#abc1e8' : '#0f141c'} !important;
+          background-color: ${currentTheme === 'light' ? '#85a5cc' : '#0f141c'} !important;
           background-image: ${currentTheme === 'light' ? 'none' : 'radial-gradient(circle at 50% 10%, #17212f, #0b0f15)'} !important;
         }
         .self-bubble-tail {
@@ -1996,7 +2443,7 @@ export default function ClinicalPlatform() {
         .line-read-badge {
           font-size: 9px;
           font-weight: 700;
-          color: ${currentTheme === 'light' ? '#3c5a85' : '#06C755'} !important;
+          color: ${currentTheme === 'light' ? '#1e3a8a' : '#06C755'} !important;
           margin-bottom: 1px;
           letter-spacing: -0.01em;
         }
@@ -2006,13 +2453,17 @@ export default function ClinicalPlatform() {
         <div>
           {/* Hospital Logo & Collapse Toggle */}
           <div className="h-16 px-4 border-b border-slate-800 flex items-center justify-between overflow-hidden">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-teal-500 flex items-center justify-center shadow-lg text-white shrink-0">
+            <div
+              onClick={() => handleTabChange('chats')}
+              className="flex items-center gap-3 cursor-pointer group"
+              title="Return to Chats"
+            >
+              <div className="h-9 w-9 rounded-xl bg-teal-500 group-hover:bg-teal-400 flex items-center justify-center shadow-lg text-white shrink-0 transition-all">
                 <Activity className="h-5 w-5 animate-pulse" />
               </div>
               {isSidebarExpanded && (
                 <div className="animate-fade-in shrink-0">
-                  <h1 className="font-extrabold text-white tracking-wide text-md">hosply</h1>
+                  <h1 className="font-extrabold text-white tracking-wide text-md group-hover:text-teal-300 transition-colors">hosply</h1>
                   <p className="text-[10px] text-teal-400 font-bold uppercase tracking-wider">Internal Message</p>
                 </div>
               )}
@@ -2058,7 +2509,7 @@ export default function ClinicalPlatform() {
           {/* Active Navigation Tabs */}
           <div className="p-4 space-y-1.5">
             <button
-              onClick={() => setActiveTab('chats')}
+              onClick={() => handleTabChange('chats')}
               className={`w-full flex items-center px-4 py-2.5 rounded-lg text-sm transition-all ${isSidebarExpanded ? 'justify-between' : 'justify-center'
                 } ${activeTab === 'chats'
                   ? 'bg-teal-900/40 text-teal-300 font-bold border-l-2 border-teal-500'
@@ -2088,7 +2539,7 @@ export default function ClinicalPlatform() {
             </button>
 
             <button
-              onClick={() => setActiveTab('directory')}
+              onClick={() => handleTabChange('directory')}
               className={`w-full flex items-center px-4 py-2.5 rounded-lg text-sm transition-all ${isSidebarExpanded ? 'justify-start gap-2.5' : 'justify-center'
                 } ${activeTab === 'directory'
                   ? 'bg-teal-900/40 text-teal-300 font-bold border-l-2 border-teal-500'
@@ -2102,7 +2553,7 @@ export default function ClinicalPlatform() {
 
             {currentUser.role === 'Admin' && (
               <button
-                onClick={() => setActiveTab('admin')}
+                onClick={() => handleTabChange('admin')}
                 className={`w-full flex items-center px-4 py-2.5 rounded-lg text-sm transition-all ${isSidebarExpanded ? 'justify-between' : 'justify-center'
                   } ${activeTab === 'admin'
                     ? 'bg-teal-900/40 text-teal-300 font-bold border-l-2 border-teal-500'
@@ -2123,7 +2574,7 @@ export default function ClinicalPlatform() {
             )}
 
             <button
-              onClick={() => setActiveTab('settings')}
+              onClick={() => handleTabChange('settings')}
               className={`w-full flex items-center px-4 py-2.5 rounded-lg text-sm transition-all ${isSidebarExpanded ? 'justify-start gap-2.5' : 'justify-center'
                 } ${activeTab === 'settings'
                   ? 'bg-teal-900/40 text-teal-300 font-bold border-l-2 border-teal-500'
@@ -2141,9 +2592,9 @@ export default function ClinicalPlatform() {
             <button
               onClick={() => setShowCreateGroup(true)}
               className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold uppercase tracking-wider py-2.5 px-4 rounded-lg border border-slate-700 transition-all active:scale-[0.98]"
-              title="Create Group Discussion"
+              title={translations[language].newGroupButton}
             >
-              {isSidebarExpanded ? "+ Create Group" : "+"}
+              {isSidebarExpanded ? `+ ${translations[language].newGroupButton}` : "+"}
             </button>
           </div>
         </div>
@@ -2162,7 +2613,7 @@ export default function ClinicalPlatform() {
                     {currentUser.firstName} {currentUser.lastName}
                   </p>
                   <span className="inline-flex items-center gap-1 text-[10px] text-teal-400 font-semibold uppercase">
-                    <UserCheck className="h-3 w-3" /> {currentUser.role}
+                    <UserCheck className="h-3 w-3" /> {getRoleLabel(currentUser.role, language)}
                   </span>
                 </div>
               )}
@@ -2220,7 +2671,13 @@ export default function ClinicalPlatform() {
                   return (
                     <button
                       key={room.id}
-                      onClick={() => setActiveRoom(room)}
+                      onClick={() => {
+                        if (activeRoom?.id === room.id) {
+                          fetchMessages(room.id);
+                        } else {
+                          setActiveRoom(room);
+                        }
+                      }}
                       onContextMenu={(e) => {
                         e.preventDefault();
                         setContextMenu({
@@ -2300,7 +2757,7 @@ export default function ClinicalPlatform() {
 
           {activeTab === 'directory' && (
             <>
-              <div className="px-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Active Staff Directory</div>
+              <div className="px-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">{translations[language].directoryTitle}</div>
               {directoryUsers
                 .filter((user) =>
                   `${user.firstName} ${user.lastName} ${user.role}`.toLowerCase().includes(chatSearchQuery.toLowerCase())
@@ -2318,7 +2775,7 @@ export default function ClinicalPlatform() {
                         <p className="text-xs font-bold text-white">
                           {user.firstName} {user.lastName}
                         </p>
-                        <span className="text-[9px] text-teal-400 font-bold uppercase tracking-wider">{user.role}</span>
+                        <span className="text-[9px] text-teal-400 font-bold uppercase tracking-wider">{getRoleLabel(user.role, language)}</span>
                       </div>
                     </div>
                     <button
@@ -2331,7 +2788,7 @@ export default function ClinicalPlatform() {
                       }}
                       className="bg-teal-500 hover:bg-teal-600 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg transition-all"
                     >
-                      Chat
+                      {translations[language].chatButton}
                     </button>
                   </div>
                 ))}
@@ -2558,14 +3015,14 @@ export default function ClinicalPlatform() {
                                       ? 'bg-sky-950/30 text-sky-400 border-sky-800/40'
                                       : 'bg-emerald-950/30 text-emerald-400 border-emerald-800/40'
                                     }`}>
-                                    {u.role}
+                                    {getRoleLabel(u.role, language)}
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 font-mono text-slate-400">{u.professionalId || '—'}</td>
                                 <td className="px-6 py-4">
                                   <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold ${u.isActive ? 'text-green-400' : 'text-slate-500'}`}>
                                     <span className={`h-1.5 w-1.5 rounded-full ${u.isActive ? 'bg-green-400' : 'bg-slate-500'}`}></span>
-                                    {u.isActive ? 'Active Duty' : 'Deactivated'}
+                                    {u.isActive ? (language === 'TH' ? 'ปฏิบัติหน้าที่' : 'Active Duty') : (language === 'TH' ? 'ระงับการใช้งาน' : 'Deactivated')}
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 text-right whitespace-nowrap">
@@ -2717,10 +3174,10 @@ export default function ClinicalPlatform() {
             {/* Password Reset Section */}
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4">
               <h3 className="text-md font-bold text-white flex items-center gap-2">
-                <Shield className="h-5 w-5 text-teal-400" /> Change Personal Password
+                <Shield className="h-5 w-5 text-teal-400" /> {translations[language].resetPasswordTitle}
               </h3>
               <p className="text-xs text-slate-400">
-                Update your active clinical account password. New passwords must be at least 6 characters long to meet HIPAA security compliance requirements.
+                {language === 'TH' ? 'อัปเดตรหัสผ่านสำหรับเข้าใช้งานระบบคลินิก รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษรตามมาตรฐานความปลอดภัย HIPAA' : 'Update your active clinical account password. New passwords must be at least 6 characters long to meet HIPAA security compliance requirements.'}
               </p>
 
               <form onSubmit={handleResetPassword} className="space-y-4 pt-2">
@@ -2742,7 +3199,7 @@ export default function ClinicalPlatform() {
                   {/* Current Password Field */}
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Current Password
+                      {translations[language].currentPasswordLabel}
                     </label>
                     <div className="relative rounded-lg shadow-sm">
                       <input
@@ -2751,7 +3208,7 @@ export default function ClinicalPlatform() {
                         value={currentPasswordInput}
                         onChange={(e) => setCurrentPasswordInput(e.target.value)}
                         className="block w-full rounded-lg bg-slate-950 border border-slate-800 px-4 py-2.5 text-xs text-white placeholder-slate-600 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 pr-10 animate-fade-in"
-                        placeholder="Enter current password"
+                        placeholder="••••••••"
                       />
                       <button
                         type="button"
@@ -2766,7 +3223,7 @@ export default function ClinicalPlatform() {
                   {/* New Password Field */}
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      New Password (min. 6 characters)
+                      {translations[language].newPasswordLabel}
                     </label>
                     <div className="relative rounded-lg shadow-sm">
                       <input
@@ -2775,7 +3232,7 @@ export default function ClinicalPlatform() {
                         value={newPasswordInput}
                         onChange={(e) => setNewPasswordInput(e.target.value)}
                         className="block w-full rounded-lg bg-slate-950 border border-slate-800 px-4 py-2.5 text-xs text-white placeholder-slate-600 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 pr-10 animate-fade-in"
-                        placeholder="Create secure new password"
+                        placeholder="••••••••"
                       />
                       <button
                         type="button"
@@ -2790,7 +3247,7 @@ export default function ClinicalPlatform() {
                   {/* Confirm New Password Field */}
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Confirm New Password
+                      {translations[language].confirmPasswordLabel}
                     </label>
                     <div className="relative rounded-lg shadow-sm">
                       <input
@@ -2799,7 +3256,7 @@ export default function ClinicalPlatform() {
                         value={confirmPasswordInput}
                         onChange={(e) => setConfirmPasswordInput(e.target.value)}
                         className="block w-full rounded-lg bg-slate-950 border border-slate-800 px-4 py-2.5 text-xs text-white placeholder-slate-600 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 pr-10 animate-fade-in"
-                        placeholder="Re-type new password"
+                        placeholder="••••••••"
                       />
                       <button
                         type="button"
@@ -2820,10 +3277,10 @@ export default function ClinicalPlatform() {
                   >
                     {isResettingPassword ? (
                       <>
-                        <Clock className="h-3.5 w-3.5 animate-spin" /> Updating Credentials...
+                        <Clock className="h-3.5 w-3.5 animate-spin" /> {translations[language].passcodeResetting}
                       </>
                     ) : (
-                      'Update Account Password'
+                      translations[language].passcodeResetButton
                     )}
                   </button>
                 </div>
@@ -2859,7 +3316,7 @@ export default function ClinicalPlatform() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-[9px] text-teal-400 font-black uppercase tracking-widest bg-teal-950/50 border border-teal-800/40 px-2 py-0.5 rounded-md">
-                        {activeRoom.type === 'DIRECT' ? '👤 1-1 Direct Message' : activeRoom.type === 'PATIENT_CONTEXT' ? '🏥 Clinical Patient Discussion' : '👥 Group Case discussion'}
+                        {activeRoom.type === 'DIRECT' ? translations[language].directChatPrefix : activeRoom.type === 'PATIENT_CONTEXT' ? translations[language].patientChatPrefix : translations[language].groupChatPrefix}
                       </span>
                       {activeRoom.type === 'PATIENT_CONTEXT' && activeRoom.patientContext && (
                         <div className="flex items-center gap-1.5">
@@ -2906,12 +3363,12 @@ export default function ClinicalPlatform() {
                       className="bg-teal-500 hover:bg-teal-600 text-white text-[10px] font-black uppercase tracking-wider px-3.5 py-1.5 rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 shadow-md shrink-0 animate-fade-in"
                     >
                       <UserPlus className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Invite Staff</span>
+                      <span className="hidden sm:inline">{translations[language].inviteMemberButton}</span>
                     </button>
                   )}
                   <span className="bg-slate-800/80 text-slate-300 text-[10px] px-3 py-1.5 rounded-lg font-bold border border-slate-700/60 uppercase tracking-wider hidden md:flex items-center gap-1.5 shrink-0">
                     <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse"></span>
-                    Now Connected
+                    {translations[language].nowConnected}
                   </span>
                 </div>
               </div>
@@ -2945,15 +3402,31 @@ export default function ClinicalPlatform() {
                         {isLoadingMore ? (
                           <>
                             <Clock className="h-3 w-3 animate-spin text-teal-400" />
-                            <span>Retrieving clinical logs...</span>
+                            <span>{translations[language].loadingEarlier}</span>
                           </>
                         ) : (
                           <>
                             <Clock className="h-3 w-3 text-teal-400" />
-                            <span>Load earlier records</span>
+                            <span>{translations[language].loadEarlier}</span>
                           </>
                         )}
                       </button>
+                    </div>
+                  )}
+
+                  {messages.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-16 text-center space-y-3 opacity-60">
+                      <div className="h-12 w-12 rounded-2xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-slate-400">
+                        <MessageSquare className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-300">
+                          {language === 'TH' ? 'ยังไม่มีข้อความในห้องสนทนานี้' : 'No messages in this chat yet'}
+                        </p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">
+                          {language === 'TH' ? 'ส่งข้อความเพื่อเริ่มต้นการสื่อสารทางการแพทย์' : 'Send a message to start secure clinical communication'}
+                        </p>
+                      </div>
                     </div>
                   )}
 
@@ -3014,9 +3487,7 @@ export default function ClinicalPlatform() {
                                 {msg.sender.firstName} {msg.sender.lastName}
                               </span>
                               <span className="text-[8px] font-black tracking-wider uppercase bg-slate-800/50 dark:bg-slate-800 text-slate-500 dark:text-teal-400 border border-slate-700/60 dark:border-slate-700 px-1.5 py-0.2 rounded-md">
-                                {typeof msg.sender.role === 'object' && msg.sender.role !== null
-                                  ? (msg.sender.role as any).name
-                                  : msg.sender.role}
+                                {getRoleLabel(msg.sender.role, language)}
                               </span>
                             </div>
                           )}
@@ -3119,12 +3590,33 @@ export default function ClinicalPlatform() {
                             </div>
 
                             {/* LINE signature Meta Info Stack next to bubble */}
-                            {isMe ? (
-                              <div className="flex flex-col justify-end items-end text-[9px] text-slate-500 dark:text-slate-400 select-none leading-none pb-0.5 shrink-0 self-end">
-                                <span className="line-read-badge">อ่านแล้ว</span>
-                                <span className="opacity-75">{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                              </div>
-                            ) : (
+                            {isMe ? (() => {
+                              const otherMembers = (activeRoom?.members || []).filter((m: any) => {
+                                const mId = m.userId || m.user?.id;
+                                return mId && mId !== currentUser?.id;
+                              });
+
+                              const readMembers = otherMembers.filter((m: any) => {
+                                if (!m.lastReadAt) return false;
+                                return new Date(m.lastReadAt).getTime() >= new Date(msg.createdAt).getTime();
+                              });
+
+                              const isRead = readMembers.length > 0;
+                              const isGroup = activeRoom?.type !== 'DIRECT';
+                              const readCount = readMembers.length;
+
+                              return (
+                                <div className="flex flex-col justify-end items-end text-[9px] text-slate-500 dark:text-slate-400 select-none leading-none pb-0.5 shrink-0 self-end">
+                                  {isRead && (
+                                    <span className="line-read-badge animate-fade-in">
+                                      {language === 'TH' ? 'อ่านแล้ว' : 'Read'}
+                                      {isGroup && readCount > 1 ? ` ${readCount}` : ''}
+                                    </span>
+                                  )}
+                                  <span className="opacity-75">{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                              );
+                            })() : (
                               <div className="flex flex-col justify-end text-[9px] text-slate-500 dark:text-slate-400 select-none leading-none pb-0.5 shrink-0 self-end">
                                 <span className="opacity-75">{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                               </div>
@@ -3139,7 +3631,7 @@ export default function ClinicalPlatform() {
                   {typingUsers.map((u) => (
                     <div key={u.userId} className="flex items-center gap-2 text-[10px] text-slate-400 animate-pulse bg-slate-900/30 p-2 rounded-lg max-w-xs border border-slate-800">
                       <Sparkles className="h-3.5 w-3.5 text-teal-400" />
-                      <span>{u.firstName} is typing a secure message...</span>
+                      <span>{u.firstName} {translations[language].typingSuffix}</span>
                     </div>
                   ))}
 
@@ -3178,7 +3670,7 @@ export default function ClinicalPlatform() {
                   <div className="flex items-center justify-between bg-slate-900/80 border border-slate-700/60 rounded-xl px-4 py-2 text-xs">
                     <div className="flex items-center gap-2">
                       <Lock className="h-3.5 w-3.5 text-teal-400" />
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Classification Level:</span>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{translations[language].classificationSelectLabel}</span>
                       <select
                         value={selectedClassification}
                         onChange={(e) => setSelectedClassification(e.target.value as any)}
@@ -3192,7 +3684,7 @@ export default function ClinicalPlatform() {
                     </div>
 
                     <span className="text-[9px] text-slate-500 flex items-center gap-1 font-bold">
-                      <Info className="h-3.5 w-3.5" /> RESTRICTED level blocks non-authorized roles.
+                      <Info className="h-3.5 w-3.5" /> {translations[language].classificationHelpText}
                     </span>
                   </div>
 
@@ -3256,7 +3748,7 @@ export default function ClinicalPlatform() {
                       type="text"
                       value={messageInput}
                       onChange={handleTypingEvent}
-                      placeholder="Type a secure message... (PHI like HN or ID is auto-scanned & blocked)"
+                      placeholder={translations[language].messagePlaceholder}
                       className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-teal-500/80 placeholder-slate-500 text-white font-medium"
                     />
                     <button
@@ -3275,7 +3767,7 @@ export default function ClinicalPlatform() {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-500 text-xs gap-3">
             <MessageSquare className="h-12 w-12 text-slate-600 animate-pulse" />
-            <span>Select a conversation or clinical room to start communicating securely.</span>
+            <span>{translations[language].emptyChatSelection}</span>
           </div>
         )}
       </div>
@@ -3285,12 +3777,12 @@ export default function ClinicalPlatform() {
         <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 max-w-md w-full p-6 rounded-2xl space-y-4 shadow-2xl clinical-glow">
             <h3 className="text-lg font-black text-white flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-teal-400" /> Launch Clinical Discussion Room
+              <Sparkles className="h-5 w-5 text-teal-400" /> {translations[language].newRoomModalTitle}
             </h3>
 
             <form onSubmit={handleCreateRoom} className="space-y-4 text-xs">
               <div className="space-y-1">
-                <label className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Discussion Room Title</label>
+                <label className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">{translations[language].newRoomTitleLabel}</label>
                 <input
                   type="text"
                   required
@@ -3299,7 +3791,7 @@ export default function ClinicalPlatform() {
                     setNewGroupName(e.target.value);
                     setCreateRoomType('GROUP');
                   }}
-                  placeholder="e.g. ER Shift Group, ICU Cardiology Intake"
+                  placeholder={translations[language].newRoomTitlePlaceholder}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-teal-500 font-medium"
                 />
               </div>
@@ -3310,13 +3802,13 @@ export default function ClinicalPlatform() {
                   onClick={() => setShowCreateGroup(false)}
                   className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-lg text-slate-300 transition-all"
                 >
-                  Cancel
+                  {translations[language].cancelBtn}
                 </button>
                 <button
                   type="submit"
                   className="bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg transition-all"
                 >
-                  Initialize Room
+                  {translations[language].initRoomBtn}
                 </button>
               </div>
             </form>
@@ -3441,7 +3933,7 @@ export default function ClinicalPlatform() {
             className="w-full text-left px-3 py-2 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition-all"
           >
             <Pin className="h-4 w-4 text-amber-400 rotate-45" />
-            <span>{pinnedRoomIds.includes(contextMenu.room.id) ? 'Unpin Chat' : 'Pin to Top'}</span>
+            <span>{pinnedRoomIds.includes(contextMenu.room.id) ? translations[language].unpinChat : translations[language].pinToTop}</span>
           </button>
 
           {contextMenu.room.type === 'DIRECT' && (
@@ -3453,7 +3945,7 @@ export default function ClinicalPlatform() {
               className="w-full text-left px-3 py-2 hover:bg-red-950/40 hover:text-red-400 flex items-center gap-2 transition-all text-rose-500/80"
             >
               <Trash2 className="h-4 w-4 text-rose-400" />
-              <span>Clear Chat History</span>
+              <span>{translations[language].clearHistory}</span>
             </button>
           )}
 
@@ -3467,7 +3959,7 @@ export default function ClinicalPlatform() {
               className="w-full text-left px-3 py-2 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition-all"
             >
               <UserPlus className="h-4 w-4 text-teal-400" />
-              <span>Invite Clinical Staff</span>
+              <span>{translations[language].inviteStaff}</span>
             </button>
           )}
 
@@ -3480,7 +3972,7 @@ export default function ClinicalPlatform() {
             className="w-full text-left px-3 py-2 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition-all"
           >
             <Paperclip className="h-4 w-4 text-sky-400" />
-            <span>Copy Secure Link</span>
+            <span>{translations[language].copyLink}</span>
           </button>
 
           <div className="border-t border-slate-800 my-1"></div>
@@ -3490,7 +3982,7 @@ export default function ClinicalPlatform() {
             className="w-full text-left px-3 py-2 hover:bg-slate-800 hover:text-slate-200 flex items-center gap-2 transition-all text-slate-400"
           >
             <X className="h-4 w-4" />
-            <span>Close Menu</span>
+            <span>{translations[language].closeMenu}</span>
           </button>
 
           {contextMenu.room.type !== 'DIRECT' && (
@@ -3502,7 +3994,7 @@ export default function ClinicalPlatform() {
               className="w-full text-left px-3 py-2 hover:bg-red-950/50 hover:text-red-400 flex items-center gap-2 transition-all text-red-500/80 rounded-b-xl"
             >
               <LogOut className="h-4 w-4" />
-              <span>Leave Group</span>
+              <span>{translations[language].leaveGroup}</span>
             </button>
           )}
         </div>
@@ -3513,16 +4005,16 @@ export default function ClinicalPlatform() {
         <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 max-w-md w-full p-6 rounded-2xl space-y-4 shadow-2xl clinical-glow animate-fade-in">
             <h3 className="text-lg font-black text-white flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-teal-400" /> Invite Clinical Staff
+              <UserPlus className="h-5 w-5 text-teal-400" /> {translations[language].inviteStaff}
             </h3>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-              Room: {inviteTargetRoom.name}
+              {translations[language].roomLabel} {inviteTargetRoom.name}
             </p>
 
             <div className="relative">
               <input
                 type="text"
-                placeholder="Search staff by name or role..."
+                placeholder={translations[language].searchStaffPlaceholder}
                 value={inviteSearchQuery}
                 onChange={(e) => setInviteSearchQuery(e.target.value)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 pl-8 text-xs text-white focus:outline-none focus:border-teal-500 font-medium"
@@ -3563,7 +4055,7 @@ export default function ClinicalPlatform() {
                           </div>
                           <div>
                             <p className="font-bold text-xs text-white leading-tight">{u.firstName} {u.lastName}</p>
-                            <span className="text-[8px] text-teal-400 uppercase tracking-widest font-bold">{u.role}</span>
+                            <span className="text-[8px] text-teal-400 uppercase tracking-widest font-bold">{getRoleLabel(u.role, language)}</span>
                           </div>
                         </div>
                         <input
@@ -3582,7 +4074,7 @@ export default function ClinicalPlatform() {
                   const query = inviteSearchQuery.toLowerCase();
                   return `${u.firstName} ${u.lastName} ${u.role}`.toLowerCase().includes(query);
                 }).length === 0 && (
-                    <p className="text-center text-slate-500 py-6">All available staff members are already in this room.</p>
+                    <p className="text-center text-slate-500 py-6">{translations[language].allMembersAdded}</p>
                   )}
               </div>
 
@@ -3595,7 +4087,7 @@ export default function ClinicalPlatform() {
                   }}
                   className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-lg text-slate-300 transition-all"
                 >
-                  Cancel
+                  {translations[language].cancelBtn}
                 </button>
                 <button
                   type="submit"
@@ -3603,7 +4095,7 @@ export default function ClinicalPlatform() {
                   className={`bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg transition-all ${inviteSelectedMembers.length === 0 ? 'opacity-30 cursor-not-allowed' : ''
                     }`}
                 >
-                  Add to Group ({inviteSelectedMembers.length})
+                  {translations[language].addMembersBtn} ({inviteSelectedMembers.length})
                 </button>
               </div>
             </form>
@@ -3846,7 +4338,7 @@ export default function ClinicalPlatform() {
       {/* LINE-Style Mobile Bottom Navigation Bar */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 flex justify-around items-center z-30 px-2 pb-safe">
         <button
-          onClick={() => { setActiveTab('chats'); setActiveRoom(null); }}
+          onClick={() => handleTabChange('chats')}
           className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 ${activeTab === 'chats' ? 'text-teal-400 font-bold' : 'text-slate-400'}`}
         >
           <MessageSquare className="h-5 w-5" />
@@ -3854,7 +4346,7 @@ export default function ClinicalPlatform() {
         </button>
 
         <button
-          onClick={() => { setActiveTab('directory'); setActiveRoom(null); }}
+          onClick={() => handleTabChange('directory')}
           className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 ${activeTab === 'directory' ? 'text-teal-400 font-bold' : 'text-slate-400'}`}
         >
           <Users className="h-5 w-5" />
@@ -3863,7 +4355,7 @@ export default function ClinicalPlatform() {
 
         {currentUser.role === 'Admin' && (
           <button
-            onClick={() => { setActiveTab('admin'); setActiveRoom(null); }}
+            onClick={() => handleTabChange('admin')}
             className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 ${activeTab === 'admin' ? 'text-teal-400 font-bold' : 'text-slate-400'}`}
           >
             <Shield className="h-5 w-5" />
@@ -3872,7 +4364,7 @@ export default function ClinicalPlatform() {
         )}
 
         <button
-          onClick={() => { setActiveTab('settings'); setActiveRoom(null); }}
+          onClick={() => handleTabChange('settings')}
           className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 ${activeTab === 'settings' ? 'text-teal-400 font-bold' : 'text-slate-400'}`}
         >
           <Settings className="h-5 w-5" />

@@ -227,6 +227,7 @@ export class ChatService {
               roomId: room.id,
               userId: id,
               role: id === creatorId ? 'ADMIN' : 'MEMBER',
+              lastReadAt: id === creatorId ? new Date() : new Date(0),
             },
           })
         )
@@ -380,6 +381,7 @@ export class ChatService {
             roomId,
             userId: id,
             role: 'MEMBER',
+            lastReadAt: new Date(0),
           },
         })
       )
