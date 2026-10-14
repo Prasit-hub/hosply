@@ -18,6 +18,7 @@ export class ChatService {
                     username: true,
                     firstName: true,
                     lastName: true,
+                    avatarUrl: true,
                     role: { select: { name: true } },
                   },
                 },
@@ -54,6 +55,7 @@ export class ChatService {
             ...rm.user,
             firstName: decrypt(rm.user.firstName),
             lastName: decrypt(rm.user.lastName),
+            avatarUrl: rm.user.avatarUrl || null,
           }
         }));
 
@@ -109,6 +111,7 @@ export class ChatService {
             username: true,
             firstName: true,
             lastName: true,
+            avatarUrl: true,
             role: { select: { name: true } },
           },
         },
@@ -140,6 +143,7 @@ export class ChatService {
           firstName: decrypt(msg.sender.firstName),
           lastName: decrypt(msg.sender.lastName),
           role: msg.sender.role.name,
+          avatarUrl: msg.sender.avatarUrl || null,
         },
       };
     });
@@ -299,6 +303,7 @@ export class ChatService {
               username: true,
               firstName: true,
               lastName: true,
+              avatarUrl: true,
               role: { select: { name: true } },
             },
           },
@@ -320,6 +325,7 @@ export class ChatService {
               username: true,
               firstName: true,
               lastName: true,
+              avatarUrl: true,
               role: { select: { name: true } },
             },
           },
@@ -337,6 +343,7 @@ export class ChatService {
         firstName: decrypt(message.sender.firstName),
         lastName: decrypt(message.sender.lastName),
         role: message.sender.role.name,
+        avatarUrl: message.sender.avatarUrl || null,
       },
     };
   }

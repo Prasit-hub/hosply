@@ -20,6 +20,7 @@ export async function GET(req: Request) {
         username: true,
         firstName: true,
         lastName: true,
+        avatarUrl: true,
         role: {
           select: {
             name: true,
@@ -34,6 +35,7 @@ export async function GET(req: Request) {
       firstName: decrypt(u.firstName),
       lastName: decrypt(u.lastName),
       role: u.role.name,
+      avatarUrl: u.avatarUrl || null,
     }));
 
     return NextResponse.json(result);

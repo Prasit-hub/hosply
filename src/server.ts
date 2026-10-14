@@ -105,8 +105,8 @@ app.prepare().then(() => {
       
       try {
         const now = new Date();
-        await prisma.roomMember.update({
-          where: { roomId_userId: { roomId: data.roomId, userId: user.id } },
+        const updated = await prisma.roomMember.updateMany({
+          where: { roomId: data.roomId, userId: user.id },
           data: { lastReadAt: now },
         });
 
@@ -116,12 +116,14 @@ app.prepare().then(() => {
           status: 'online',
         });
 
-        // Broadcast read status
-        io.to(`room_${data.roomId}`).emit('userReadRoom', {
-          userId: user.id,
-          roomId: data.roomId,
-          lastReadAt: now.toISOString(),
-        });
+        // Broadcast read status if member exists
+        if (updated.count > 0) {
+          io.to(`room_${data.roomId}`).emit('userReadRoom', {
+            userId: user.id,
+            roomId: data.roomId,
+            lastReadAt: now.toISOString(),
+          });
+        }
       } catch (err) {
         console.error('[Socket] Failed to update/broadcast lastReadAt on joinRoom:', err);
       }
@@ -131,16 +133,18 @@ app.prepare().then(() => {
       if (!user) return;
       try {
         const now = new Date();
-        await prisma.roomMember.update({
-          where: { roomId_userId: { roomId: data.roomId, userId: user.id } },
+        const updated = await prisma.roomMember.updateMany({
+          where: { roomId: data.roomId, userId: user.id },
           data: { lastReadAt: now },
         });
 
-        io.to(`room_${data.roomId}`).emit('userReadRoom', {
-          userId: user.id,
-          roomId: data.roomId,
-          lastReadAt: now.toISOString(),
-        });
+        if (updated.count > 0) {
+          io.to(`room_${data.roomId}`).emit('userReadRoom', {
+            userId: user.id,
+            roomId: data.roomId,
+            lastReadAt: now.toISOString(),
+          });
+        }
       } catch (err) {
         console.error('[Socket] Failed to update/broadcast lastReadAt on readRoom:', err);
       }

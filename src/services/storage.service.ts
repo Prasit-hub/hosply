@@ -4,6 +4,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { BlobServiceClient } from '@azure/storage-blob';
+import { put, del } from '@vercel/blob';
 
 export interface UploadedFileDto {
   originalname: string;
@@ -29,42 +30,106 @@ export class StorageService {
       containerClient.createIfNotExists().catch((err: any) => {
         console.error('[Storage] Failed to initialize Azure Container:', err.message);
       });
-    } else {
-      if (!fs.existsSync(this.uploadDir)) {
-        fs.mkdirSync(this.uploadDir, { recursive: true });
-      }
+    }
+
+    if (!fs.existsSync(this.uploadDir)) {
+      fs.mkdirSync(this.uploadDir, { recursive: true });
+    }
+    const avatarDir = path.join(this.uploadDir, 'avatars');
+    if (!fs.existsSync(avatarDir)) {
+      fs.mkdirSync(avatarDir, { recursive: true });
     }
   }
 
-  /**
-   * Encrypts a binary file buffer on-the-fly using AES-256-CBC
-   * Prepends the 16-byte initialization vector (IV) to the start of the payload.
-   */
-  private encryptFile(buffer: Buffer): Buffer {
-    const rawKey = process.env.ENCRYPTION_KEY || 'b495b76a3b357ecdd22e9f8837b7948f8a3bc83a42dc4cadd16b44c35ca6f92e';
-    const keyBuffer = crypto.createHash('sha256').update(rawKey).digest();
-    
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv('aes-256-cbc', keyBuffer, iv);
-    const encrypted = Buffer.concat([cipher.update(buffer), cipher.final()]);
-    
-    // Prepend 16-byte IV to the encrypted content
-    return Buffer.concat([iv, encrypted]);
+  public get hasVercelBlob(): boolean {
+    return !!(process.env.BLOB_READ_WRITE_TOKEN && process.env.BLOB_READ_WRITE_TOKEN.trim());
   }
 
   /**
-   * Decrypts an encrypted binary file payload on-the-fly using AES-256-CBC
-   * Extracts the first 16-bytes as the IV, and decodes the rest back to the original file.
+   * Saves a user profile photo using @vercel/blob (or disk fallback)
+   * and updates user.avatarUrl in the database.
    */
-  private decryptFile(encryptedBuffer: Buffer): Buffer {
-    const rawKey = process.env.ENCRYPTION_KEY || 'b495b76a3b357ecdd22e9f8837b7948f8a3bc83a42dc4cadd16b44c35ca6f92e';
-    const keyBuffer = crypto.createHash('sha256').update(rawKey).digest();
-    
-    const iv = encryptedBuffer.subarray(0, 16);
-    const ciphertext = encryptedBuffer.subarray(16);
-    
-    const decipher = crypto.createDecipheriv('aes-256-cbc', keyBuffer, iv);
-    return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  async saveUserPhoto(file: UploadedFileDto, userId: string): Promise<string> {
+    if (file.size > 10 * 1024) {
+      throw new Error('User profile photo must not exceed 10KB');
+    }
+
+    const ext = path.extname(file.originalname) || '.jpg';
+    const cleanExt = ext.startsWith('.') ? ext : `.${ext}`;
+    const pathname = `avatars/user-${userId}-${Date.now()}${cleanExt}`;
+    let avatarUrl: string;
+
+    if (this.hasVercelBlob) {
+      try {
+        const blob = await put(pathname, file.buffer, {
+          access: 'public',
+          contentType: file.mimetype || 'image/jpeg',
+        });
+        avatarUrl = blob.url;
+        console.log(`[StorageService] Photo uploaded to Vercel Blob: ${avatarUrl}`);
+      } catch (err: any) {
+        console.error('[StorageService] Vercel Blob photo upload failed, falling back to local storage:', err.message);
+        avatarUrl = this.saveLocalUserPhoto(file.buffer, pathname);
+      }
+    } else {
+      avatarUrl = this.saveLocalUserPhoto(file.buffer, pathname);
+    }
+
+    // Update in database
+    await prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl },
+    });
+
+    return avatarUrl;
+  }
+
+  /**
+   * Deletes a user profile photo from Vercel Blob / local storage
+   * and clears user.avatarUrl in the database.
+   */
+  async deleteUserPhoto(userId: string): Promise<void> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { avatarUrl: true },
+    });
+
+    if (user?.avatarUrl) {
+      if (this.hasVercelBlob && (user.avatarUrl.includes('vercel-storage.com') || user.avatarUrl.includes('blob.vercel'))) {
+        try {
+          await del(user.avatarUrl);
+          console.log(`[StorageService] Deleted avatar from Vercel Blob: ${user.avatarUrl}`);
+        } catch (err: any) {
+          console.warn('[StorageService] Could not delete from Vercel Blob:', err.message);
+        }
+      } else if (user.avatarUrl.startsWith('/api/uploads/avatars/')) {
+        const filename = path.basename(user.avatarUrl);
+        const filePath = path.join(this.uploadDir, 'avatars', filename);
+        if (fs.existsSync(filePath)) {
+          try {
+            fs.unlinkSync(filePath);
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl: null },
+    });
+  }
+
+  private saveLocalUserPhoto(buffer: Buffer, relativePathname: string): string {
+    const avatarDir = path.join(this.uploadDir, 'avatars');
+    if (!fs.existsSync(avatarDir)) {
+      fs.mkdirSync(avatarDir, { recursive: true });
+    }
+    const filename = path.basename(relativePathname);
+    const filePath = path.join(avatarDir, filename);
+    fs.writeFileSync(filePath, buffer);
+    return `/api/uploads/avatars/${filename}`;
   }
 
   // Pre-signed download url simulation
@@ -146,8 +211,22 @@ export class StorageService {
       ipAddress,
     });
 
+    // 1. If stored in Vercel Blob (starts with http:// or https://)
+    if (attachment.storageKey.startsWith('http://') || attachment.storageKey.startsWith('https://')) {
+      const res = await fetch(attachment.storageKey);
+      if (!res.ok) {
+        throw new Error(`Failed to download attachment from Vercel Blob: ${res.statusText}`);
+      }
+      const arrayBuffer = await res.arrayBuffer();
+      return {
+        buffer: Buffer.from(arrayBuffer),
+        fileName: attachment.fileName,
+        fileType: attachment.fileType,
+      };
+    }
+
+    // 2. Azure Storage Blob
     if (this.connectionString && this.blobServiceClient) {
-      // Download encrypted bytes from Azure Storage Blob directly into RAM Buffer
       const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
       const blobClient = containerClient.getBlobClient(attachment.storageKey);
       const encryptedBuffer = await blobClient.downloadToBuffer();
@@ -157,42 +236,61 @@ export class StorageService {
         fileName: attachment.fileName,
         fileType: attachment.fileType,
       };
-    } else {
-      // Local disk fallback
-      const filePath = path.join(this.uploadDir, attachment.storageKey);
-      if (!fs.existsSync(filePath)) {
-        throw new Error('Physical file not found on disk');
-      }
-
-      // Read encrypted file from disk
-      const encryptedBuffer = fs.readFileSync(filePath);
-
-      return {
-        buffer: encryptedBuffer,
-        fileName: attachment.fileName,
-        fileType: attachment.fileType,
-      };
     }
+
+    // 3. Local disk fallback
+    const filePath = path.join(this.uploadDir, attachment.storageKey);
+    if (!fs.existsSync(filePath)) {
+      throw new Error('Physical file not found on disk');
+    }
+
+    const encryptedBuffer = fs.readFileSync(filePath);
+
+    return {
+      buffer: encryptedBuffer,
+      fileName: attachment.fileName,
+      fileType: attachment.fileType,
+    };
   }
 
   async saveUploadedFile(file: UploadedFileDto, roomId: string, senderId: string): Promise<any> {
-    const storageKey = crypto.randomUUID() + path.extname(file.originalname);
-    
-    // In Model B (Client-side E2EE), the buffer is already encrypted by the browser
-    const bufferToSave = file.buffer;
+    if (file.size > 10 * 1024 * 1024) {
+      throw new Error('Attachment exceeds maximum 10MB limit');
+    }
 
-    if (this.connectionString && this.blobServiceClient) {
-      // Upload encrypted payload to Azure Storage Blob
+    const filename = crypto.randomUUID() + path.extname(file.originalname);
+    const bufferToSave = file.buffer;
+    let storageKey = filename;
+
+    // 1. Try Vercel Blob first
+    if (this.hasVercelBlob) {
+      try {
+        const pathname = `attachments/${roomId}/${filename}`;
+        const blob = await put(pathname, bufferToSave, {
+          access: 'public',
+          contentType: 'application/octet-stream',
+        });
+        storageKey = blob.url;
+        console.log(`[StorageService] Chat attachment uploaded to Vercel Blob: ${blob.url}`);
+      } catch (blobErr: any) {
+        console.error('[StorageService] Vercel Blob attachment upload failed, falling back to disk:', blobErr.message);
+        const filePath = path.join(this.uploadDir, filename);
+        fs.writeFileSync(filePath, bufferToSave);
+        storageKey = filename;
+      }
+    } else if (this.connectionString && this.blobServiceClient) {
+      // 2. Azure Storage Blob
       const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
-      const blockBlobClient = containerClient.getBlockBlobClient(storageKey);
+      const blockBlobClient = containerClient.getBlockBlobClient(filename);
       await blockBlobClient.upload(bufferToSave, bufferToSave.length, {
-        // Set content type to unreadable generic stream so cloud inspectors cannot read metadata
         blobHTTPHeaders: { blobContentType: 'application/octet-stream' }
       });
+      storageKey = filename;
     } else {
-      // Local disk fallback
-      const filePath = path.join(this.uploadDir, storageKey);
+      // 3. Local disk fallback
+      const filePath = path.join(this.uploadDir, filename);
       fs.writeFileSync(filePath, bufferToSave);
+      storageKey = filename;
     }
 
     // Link the attachment metadata in the database

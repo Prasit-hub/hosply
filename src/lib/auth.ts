@@ -13,6 +13,7 @@ export interface AuthenticatedUser {
   firstName: string;
   lastName: string;
   role: string;
+  avatarUrl?: string | null;
 }
 
 export async function verifyJwtAndGetUser(req: Request): Promise<AuthenticatedUser | null> {
@@ -40,6 +41,7 @@ export async function verifyJwtAndGetUser(req: Request): Promise<AuthenticatedUs
       firstName: decrypt(user.firstName),
       lastName: decrypt(user.lastName),
       role: user.role.name,
+      avatarUrl: user.avatarUrl || null,
     };
   } catch (error) {
     return null;

@@ -1,0 +1,6 @@
+CLINICAL LABORATORY REPORT
+Patient ID: P-90821
+Specimen: Blood Serum
+Result: Normal ranges verified
+Classification: RESTRICTED
+Timestamp: 2026-10-14

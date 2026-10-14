@@ -41,6 +41,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (professionalId !== undefined) updateData.professionalId = professionalId || null;
     if (roleId) updateData.roleId = roleId;
     if (isActive !== undefined) updateData.isActive = isActive;
+    if (body.avatarUrl !== undefined) updateData.avatarUrl = body.avatarUrl || null;
 
     if (password) {
       updateData.passwordHash = await bcrypt.hash(password, 10);
@@ -60,6 +61,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         firstName: decrypt(updatedUser.firstName),
         lastName: decrypt(updatedUser.lastName),
         professionalId: updatedUser.professionalId,
+        avatarUrl: updatedUser.avatarUrl || null,
         role: updatedUser.role.name,
         isActive: updatedUser.isActive,
       },

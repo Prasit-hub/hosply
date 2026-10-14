@@ -38,7 +38,9 @@ import {
   X,
   Pin,
   Trash2,
-  LogIn
+  LogIn,
+  Camera,
+  UploadCloud
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
@@ -95,6 +97,7 @@ interface UserSession {
   firstName: string;
   lastName: string;
   role: string;
+  avatarUrl?: string | null;
   accessToken: string;
 }
 
@@ -129,6 +132,7 @@ interface Message {
     firstName: string;
     lastName: string;
     role: string;
+    avatarUrl?: string | null;
   };
   attachments?: any[];
 }
@@ -203,6 +207,12 @@ const translations = {
     profileTitle: 'Professional Profile Settings',
     roleLabel: 'Professional Clinical Role',
     usernameLabelSettings: 'Clinical Staff Username',
+    uploadPhoto: 'Upload Profile Photo',
+    changePhoto: 'Change Photo',
+    removePhoto: 'Remove Photo',
+    photoUploading: 'Uploading to Vercel Blob...',
+    photoUpdated: 'Profile photo updated successfully via Vercel Blob',
+    photoRemoved: 'Profile photo removed',
     resetPasswordTitle: 'Security Passcode Reset',
     currentPasswordLabel: 'Current Security Passcode',
     newPasswordLabel: 'New Security Passcode',
@@ -332,6 +342,12 @@ const translations = {
     profileTitle: 'ตั้งค่าโปรไฟล์วิชาชีพ',
     roleLabel: 'ตำแหน่งวิชาชีพหลัก',
     usernameLabelSettings: 'ชื่อผู้ใช้บัญชีสุขภาพ',
+    uploadPhoto: 'อัปโหลดรูปโปรไฟล์',
+    changePhoto: 'เปลี่ยนรูปภาพ',
+    removePhoto: 'ลบรูปภาพ',
+    photoUploading: 'กำลังอัปโหลดไปยัง Vercel Blob...',
+    photoUpdated: 'อัปเดตรูปโปรไฟล์ผ่าน Vercel Blob สำเร็จ',
+    photoRemoved: 'ลบรูปโปรไฟล์เรียบร้อย',
     resetPasswordTitle: 'เปลี่ยนรหัสผ่านรหัสความปลอดภัย',
     currentPasswordLabel: 'รหัสผ่านความปลอดภัยปัจจุบัน',
     newPasswordLabel: 'รหัสผ่านความปลอดภัยใหม่',
@@ -413,6 +429,34 @@ export default function ClinicalPlatform() {
   useEffect(() => {
     localStorage.setItem('hosply_theme', currentTheme);
   }, [currentTheme]);
+
+  // Vercel Blob Profile Photo States
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Restore authenticated session from localStorage on client mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('hosply_user_session');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.accessToken) {
+          setCurrentUser(parsed);
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
+  // Sync user session to localStorage
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('hosply_user_session', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('hosply_user_session');
+    }
+  }, [currentUser]);
 
 
 
@@ -648,6 +692,163 @@ export default function ClinicalPlatform() {
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
+  };
+
+  // Helper to resize and compress user photo strictly to not exceed 10KB
+  const resizeAndCompressPhoto = (file: File, maxSizeBytes = 10 * 1024): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          let targetWidth = img.width;
+          let targetHeight = img.height;
+          const MAX_AVATAR_DIM = 180;
+
+          if (targetWidth > MAX_AVATAR_DIM || targetHeight > MAX_AVATAR_DIM) {
+            if (targetWidth > targetHeight) {
+              targetHeight = Math.round((targetHeight * MAX_AVATAR_DIM) / targetWidth);
+              targetWidth = MAX_AVATAR_DIM;
+            } else {
+              targetWidth = Math.round((targetWidth * MAX_AVATAR_DIM) / targetHeight);
+              targetHeight = MAX_AVATAR_DIM;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(file);
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+          let quality = 0.82;
+
+          const attemptCompress = () => {
+            canvas.toBlob(
+              (newBlob) => {
+                if (!newBlob) {
+                  resolve(file);
+                  return;
+                }
+
+                if (newBlob.size <= maxSizeBytes || (quality <= 0.15 && targetWidth <= 48)) {
+                  const compressedFile = new File([newBlob], `avatar-${Date.now()}.jpg`, {
+                    type: 'image/jpeg',
+                  });
+                  console.log(`[Photo] Resized from ${Math.round(file.size / 1024)}KB down to ${(compressedFile.size / 1024).toFixed(1)}KB (<=10KB limit)`);
+                  resolve(compressedFile);
+                } else {
+                  if (quality > 0.3) {
+                    quality -= 0.15;
+                  } else {
+                    targetWidth = Math.max(48, Math.round(targetWidth * 0.8));
+                    targetHeight = Math.max(48, Math.round(targetHeight * 0.8));
+                    canvas.width = targetWidth;
+                    canvas.height = targetHeight;
+                    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                    quality = 0.6;
+                  }
+                  attemptCompress();
+                }
+              },
+              'image/jpeg',
+              quality
+            );
+          };
+
+          attemptCompress();
+        };
+        img.onerror = () => resolve(file);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentUser) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select a valid image (JPEG, PNG, WebP, GIF)', 'error');
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    try {
+      // Automatically resize & compress photo strictly to <= 10KB
+      const resizedPhoto = await resizeAndCompressPhoto(file, 10 * 1024);
+
+      if (resizedPhoto.size > 10 * 1024) {
+        showToast('Photo could not be compressed under 10KB. Please choose a simpler photo.', 'error');
+        setIsUploadingPhoto(false);
+        if (e.target) e.target.value = '';
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('photo', resizedPhoto);
+
+      const res = await fetch(`${API_URL}/api/users/me/photo`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${currentUser.accessToken}`,
+        },
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to upload photo');
+      }
+
+      const data = await res.json();
+      setCurrentUser(prev => prev ? { ...prev, avatarUrl: data.avatarUrl } : null);
+      showToast(`Profile photo resized (${(resizedPhoto.size / 1024).toFixed(1)} KB ≤ 10KB) & saved!`, 'success');
+      
+      // Refresh directory and rooms so avatars update everywhere
+      fetchRooms();
+      fetchDirectory();
+    } catch (err: any) {
+      showToast(err.message || 'Photo upload failed', 'error');
+    } finally {
+      setIsUploadingPhoto(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handlePhotoDelete = async () => {
+    if (!currentUser || !currentUser.avatarUrl) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      const res = await fetch(`${API_URL}/api/users/me/photo`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${currentUser.accessToken}`,
+        },
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to remove photo');
+      }
+
+      setCurrentUser(prev => prev ? { ...prev, avatarUrl: null } : null);
+      showToast(translations[language].photoRemoved || 'Profile photo removed', 'info');
+      fetchRooms();
+      fetchDirectory();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to remove photo', 'error');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   useEffect(() => {
@@ -957,6 +1158,7 @@ export default function ClinicalPlatform() {
         firstName: data.user.firstName,
         lastName: data.user.lastName,
         role: data.user.role,
+        avatarUrl: data.user.avatarUrl || null,
         accessToken: data.accessToken,
       });
     } catch (err: any) {
@@ -1011,6 +1213,7 @@ export default function ClinicalPlatform() {
         firstName: data.user.firstName,
         lastName: data.user.lastName,
         role: data.user.role,
+        avatarUrl: data.user.avatarUrl || null,
         accessToken: data.accessToken,
       });
     } catch (err: any) {
@@ -1023,6 +1226,7 @@ export default function ClinicalPlatform() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    localStorage.removeItem('hosply_user_session');
     setRooms([]);
     setActiveRoom(null);
     setMessages([]);
@@ -1558,6 +1762,17 @@ export default function ClinicalPlatform() {
     const originalFile = e.target.files?.[0];
     if (!originalFile || !activeRoom) return;
 
+    // Security & Storage Policy: Enforce maximum 10MB limit for all attachment files
+    if (originalFile.size > 10 * 1024 * 1024) {
+      showClinicalModal(
+        'File Size Exceeded',
+        `The file "${originalFile.name}" (${(originalFile.size / (1024 * 1024)).toFixed(1)} MB) exceeds the maximum allowed attachment limit of 10 MB.`,
+        'error'
+      );
+      e.target.value = '';
+      return;
+    }
+
     setIsUploadingFile(true);
     
     try {
@@ -1604,9 +1819,9 @@ export default function ClinicalPlatform() {
       });
 
       if (originalFile.size > 100 * 1024 && originalFile.type.startsWith('image/')) {
-        showToast(`Image optimized & uploaded successfully (${Math.round(file.size / 1024)} KB)`, 'success');
+        showToast(`Image encrypted & stored via Vercel Blob (${Math.round(file.size / 1024)} KB)`, 'success');
       } else {
-        showToast('File uploaded successfully!', 'success');
+        showToast('File encrypted & stored via Vercel Blob successfully!', 'success');
       }
     } catch (err: any) {
       showClinicalModal(
@@ -1768,6 +1983,7 @@ export default function ClinicalPlatform() {
           firstName: currentUser?.firstName || 'สมชาย',
           lastName: currentUser?.lastName || 'รักดี',
           role: currentUser?.role || 'Doctor',
+          avatarUrl: currentUser?.avatarUrl || null,
         },
         attachments: filePayload,
       };
@@ -2187,6 +2403,13 @@ export default function ClinicalPlatform() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 font-sans">
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handlePhotoUpload}
+      />
       <style>{`
         :root {
           --accent-color: ${currentTheme === 'teal' ? '#06C755' : currentTheme === 'navy' ? '#3b82f6' : currentTheme === 'emerald' ? '#10b981' : '#0284c7'};
@@ -2603,9 +2826,26 @@ export default function ClinicalPlatform() {
         <div className="p-4 border-t border-slate-800 bg-slate-900/50">
           <div className={`flex items-center ${isSidebarExpanded ? 'justify-between' : 'flex-col gap-3 justify-center'}`}>
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-slate-800 border-2 status-ring-online flex items-center justify-center text-white shrink-0 relative">
-                <User className="h-5 w-5" />
-                <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-slate-900"></span>
+              <div
+                onClick={() => photoInputRef.current?.click()}
+                className="group relative h-10 w-10 rounded-full bg-slate-800 border-2 status-ring-online flex items-center justify-center text-white shrink-0 cursor-pointer overflow-hidden transition-all hover:scale-105 hover:ring-2 hover:ring-teal-400"
+                title="Click to update profile photo (Vercel Blob)"
+              >
+                {isUploadingPhoto ? (
+                  <Clock className="h-4 w-4 animate-spin text-teal-400" />
+                ) : currentUser.avatarUrl ? (
+                  <img
+                    src={currentUser.avatarUrl}
+                    alt={`${currentUser.firstName} ${currentUser.lastName}`}
+                    className="h-full w-full object-cover rounded-full"
+                  />
+                ) : (
+                  <User className="h-5 w-5" />
+                )}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-full">
+                  <Camera className="h-3.5 w-3.5 text-teal-300" />
+                </div>
+                <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-slate-900 z-10"></span>
               </div>
               {isSidebarExpanded && (
                 <div className="overflow-hidden animate-fade-in">
@@ -2768,8 +3008,16 @@ export default function ClinicalPlatform() {
                     className="p-3 rounded-xl bg-slate-800/30 border border-slate-800/80 hover:bg-slate-800/60 transition-all flex items-center justify-between"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="h-8.5 w-8.5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold text-xs uppercase">
-                        {user.firstName[0]}
+                      <div className="h-8.5 w-8.5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold text-xs uppercase overflow-hidden shrink-0">
+                        {user.avatarUrl ? (
+                          <img
+                            src={user.avatarUrl}
+                            alt={user.firstName}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          user.firstName[0]
+                        )}
                       </div>
                       <div>
                         <p className="text-xs font-bold text-white">
@@ -3000,8 +3248,16 @@ export default function ClinicalPlatform() {
                             paginatedUsers.map((u) => (
                               <tr key={u.id} className="hover:bg-slate-800/15 transition-colors">
                                 <td className="px-6 py-4 flex items-center gap-3">
-                                  <div className="h-8.5 w-8.5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-slate-300 uppercase shadow-sm">
-                                    {u.firstName ? u.firstName[0] : 'U'}
+                                  <div className="h-8.5 w-8.5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-slate-300 uppercase shadow-sm overflow-hidden shrink-0">
+                                    {u.avatarUrl ? (
+                                      <img
+                                        src={u.avatarUrl}
+                                        alt={u.firstName}
+                                        className="h-full w-full object-cover"
+                                      />
+                                    ) : (
+                                      u.firstName ? u.firstName[0] : 'U'
+                                    )}
                                   </div>
                                   <div>
                                     <p className="font-extrabold text-white">{u.firstName} {u.lastName}</p>
@@ -3126,6 +3382,85 @@ export default function ClinicalPlatform() {
             <h2 className="text-2xl font-black text-white tracking-tight border-b border-slate-800 pb-4">
               System Settings & Security Config
             </h2>
+
+            {/* Profile Photo & Vercel Blob Card */}
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4 shadow-xl">
+              <div className="flex items-center justify-between">
+                <h3 className="text-md font-bold text-white flex items-center gap-2">
+                  <User className="h-5 w-5 text-teal-400" />
+                  {translations[language].profileTitle}
+                </h3>
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-teal-950/60 text-teal-300 border border-teal-500/30">
+                  <UploadCloud className="h-3 w-3" /> Vercel Blob Storage
+                </span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 pt-2">
+                <div className="relative group shrink-0">
+                  <div className="h-20 w-20 rounded-full bg-slate-800 border-2 border-teal-500/60 shadow-lg shadow-teal-500/10 flex items-center justify-center text-white overflow-hidden">
+                    {isUploadingPhoto ? (
+                      <Clock className="h-6 w-6 animate-spin text-teal-400" />
+                    ) : currentUser?.avatarUrl ? (
+                      <img
+                        src={currentUser.avatarUrl}
+                        alt={`${currentUser.firstName} ${currentUser.lastName}`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-2xl font-black text-teal-400">
+                        {currentUser?.firstName ? currentUser.firstName[0] : 'U'}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={isUploadingPhoto}
+                    className="absolute bottom-0 right-0 p-1.5 rounded-full bg-teal-500 text-slate-950 hover:bg-teal-400 transition-transform active:scale-95 shadow-md"
+                    title={translations[language].changePhoto}
+                  >
+                    <Camera className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <div className="flex-1 text-center sm:text-left space-y-2">
+                  <div>
+                    <h4 className="text-sm font-extrabold text-white">
+                      {currentUser?.firstName} {currentUser?.lastName}
+                    </h4>
+                    <p className="text-xs text-slate-400 font-mono">@{currentUser?.username} • {getRoleLabel(currentUser?.role || '', language)}</p>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    {language === 'TH'
+                      ? 'รูปโปรไฟล์วิชาชีพของคุณจะถูกปรับขนาดและบีบอัดอัตโนมัติไม่เกิน 10KB และจัดเก็บบน Vercel Blob Storage พร้อมระบบส่งมอบความเร็วสูง (Global Edge CDN)'
+                      : 'Your professional profile photo is automatically resized and compressed to under 10KB, securely hosted via Vercel Blob cloud storage.'}
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1 justify-center sm:justify-start">
+                    <button
+                      type="button"
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={isUploadingPhoto}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 text-xs font-bold transition-all disabled:opacity-50"
+                    >
+                      <Camera className="h-3.5 w-3.5" />
+                      {isUploadingPhoto ? translations[language].photoUploading : (currentUser?.avatarUrl ? translations[language].changePhoto : translations[language].uploadPhoto)}
+                    </button>
+                    {currentUser?.avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={handlePhotoDelete}
+                        disabled={isUploadingPhoto}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-950/30 hover:bg-red-900/40 text-red-400 border border-red-800/40 text-xs font-bold transition-all disabled:opacity-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {translations[language].removePhoto}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4">
               <h3 className="text-md font-bold text-white flex items-center gap-2"><Lock className="h-5 w-5 text-teal-400" /> Security Credentials</h3>
               <p className="text-xs text-slate-400">All message payloads are encrypted end-to-end within the database file via AES-256. Private key rotation happens under administrator supervision.</p>
@@ -3342,8 +3677,16 @@ export default function ClinicalPlatform() {
                   {activeRoom.members && activeRoom.type !== 'DIRECT' && (
                     <div className="flex items-center -space-x-2 mr-2">
                       {activeRoom.members.slice(0, 10).map((m: any) => (
-                        <div key={m.userId} title={`${m.user.firstName} ${m.user.lastName} (${m.user.role.name})`} className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center font-bold text-[9px] text-white uppercase shadow-sm">
-                          {m.user.firstName[0]}
+                        <div key={m.userId} title={`${m.user.firstName} ${m.user.lastName} (${m.user.role.name})`} className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center font-bold text-[9px] text-white uppercase shadow-sm overflow-hidden shrink-0">
+                          {m.user.avatarUrl ? (
+                            <img
+                              src={m.user.avatarUrl}
+                              alt={m.user.firstName}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            m.user.firstName[0]
+                          )}
                         </div>
                       ))}
                       {activeRoom.members.length > 10 && (
@@ -3469,8 +3812,16 @@ export default function ClinicalPlatform() {
                         {!isMe && (
                           <div className="w-9 shrink-0 flex justify-center">
                             {!isPrevSame ? (
-                              <div className="h-9 w-9 rounded-full border bg-slate-800 border-slate-700 text-slate-300 flex items-center justify-center font-bold text-xs uppercase shadow-sm transition-all hover:scale-105">
-                                {msg.sender.firstName ? msg.sender.firstName[0] : 'U'}
+                              <div className="h-9 w-9 rounded-full border bg-slate-800 border-slate-700 text-slate-300 flex items-center justify-center font-bold text-xs uppercase shadow-sm transition-all hover:scale-105 overflow-hidden shrink-0">
+                                {msg.sender.avatarUrl ? (
+                                  <img
+                                    src={msg.sender.avatarUrl}
+                                    alt={msg.sender.firstName}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  msg.sender.firstName ? msg.sender.firstName[0] : 'U'
+                                )}
                               </div>
                             ) : (
                               <div className="w-9 h-1" /> /* Spacer for alignment */
@@ -3739,10 +4090,14 @@ export default function ClinicalPlatform() {
                       type="button"
                       disabled={isUploadingFile}
                       onClick={() => fileInputRef.current?.click()}
-                      className={`p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white rounded-xl transition-all ${isUploadingFile ? 'opacity-30 cursor-not-allowed' : ''}`}
-                      title="Attach clinical document (PDF, PNG)"
+                      className={`p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white rounded-xl transition-all ${isUploadingFile ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title="Attach clinical document (Max 10MB, stored via Vercel Blob)"
                     >
-                      <Paperclip className="h-4.5 w-4.5" />
+                      {isUploadingFile ? (
+                        <Clock className="h-4.5 w-4.5 animate-spin text-teal-400" />
+                      ) : (
+                        <Paperclip className="h-4.5 w-4.5" />
+                      )}
                     </button>
                     <input
                       type="text"

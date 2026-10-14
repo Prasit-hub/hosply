@@ -24,9 +24,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'Target roomId must be specified' }, { status: 400 });
     }
 
-    // Limit to 20MB
-    if (file.size > 20 * 1024 * 1024) {
-      return NextResponse.json({ message: 'Security Policy: File exceeds maximum 20MB size limit' }, { status: 400 });
+    // Limit to 10MB
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ message: 'Security Policy: File exceeds maximum 10MB size limit' }, { status: 400 });
     }
 
     const arrayBuffer = await file.arrayBuffer();
