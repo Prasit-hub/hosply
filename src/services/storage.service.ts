@@ -61,12 +61,34 @@ export class StorageService {
 
     if (this.hasVercelBlob) {
       try {
-        const blob = await put(pathname, file.buffer, {
-          access: 'public',
-          contentType: file.mimetype || 'image/jpeg',
-        });
-        avatarUrl = blob.url;
-        console.log(`[StorageService] Photo uploaded to Vercel Blob: ${avatarUrl}`);
+        let blob;
+        let isPrivate = false;
+        try {
+          blob = await put(pathname, file.buffer, {
+            access: 'public',
+            contentType: file.mimetype || 'image/jpeg',
+          });
+        } catch (err: any) {
+          if (err.message && (err.message.includes('private access') || err.message.includes('private store'))) {
+            blob = await put(pathname, file.buffer, {
+              access: 'private',
+              contentType: file.mimetype || 'image/jpeg',
+            });
+            isPrivate = true;
+          } else {
+            throw err;
+          }
+        }
+
+        // If the store is private, browser <img> tags cannot access the private Vercel URL directly (returns 403 Forbidden).
+        // Therefore, we cache locally as /api/uploads/avatars/... while keeping the photo safely backed up in Vercel Blob.
+        if (isPrivate) {
+          this.saveLocalUserPhoto(file.buffer, pathname);
+          avatarUrl = `/api/uploads/avatars/${path.basename(pathname)}`;
+        } else {
+          avatarUrl = blob.url;
+        }
+        console.log(`[StorageService] Photo uploaded to Vercel Blob: ${blob.url} (avatarUrl: ${avatarUrl})`);
       } catch (err: any) {
         console.error('[StorageService] Vercel Blob photo upload failed, falling back to local storage:', err.message);
         avatarUrl = this.saveLocalUserPhoto(file.buffer, pathname);
@@ -213,7 +235,11 @@ export class StorageService {
 
     // 1. If stored in Vercel Blob (starts with http:// or https://)
     if (attachment.storageKey.startsWith('http://') || attachment.storageKey.startsWith('https://')) {
-      const res = await fetch(attachment.storageKey);
+      const headers: Record<string, string> = {};
+      if (process.env.BLOB_READ_WRITE_TOKEN) {
+        headers['Authorization'] = `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`;
+      }
+      const res = await fetch(attachment.storageKey, { headers });
       if (!res.ok) {
         throw new Error(`Failed to download attachment from Vercel Blob: ${res.statusText}`);
       }
@@ -266,10 +292,22 @@ export class StorageService {
     if (this.hasVercelBlob) {
       try {
         const pathname = `attachments/${roomId}/${filename}`;
-        const blob = await put(pathname, bufferToSave, {
-          access: 'public',
-          contentType: 'application/octet-stream',
-        });
+        let blob;
+        try {
+          blob = await put(pathname, bufferToSave, {
+            access: 'public',
+            contentType: 'application/octet-stream',
+          });
+        } catch (err: any) {
+          if (err.message && (err.message.includes('private access') || err.message.includes('private store'))) {
+            blob = await put(pathname, bufferToSave, {
+              access: 'private',
+              contentType: 'application/octet-stream',
+            });
+          } else {
+            throw err;
+          }
+        }
         storageKey = blob.url;
         console.log(`[StorageService] Chat attachment uploaded to Vercel Blob: ${blob.url}`);
       } catch (blobErr: any) {

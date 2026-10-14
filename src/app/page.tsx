@@ -804,8 +804,21 @@ export default function ClinicalPlatform() {
       });
 
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || 'Failed to upload photo');
+        let errMsg = 'Failed to upload photo';
+        try {
+          const contentType = res.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const errData = await res.json();
+            errMsg = errData.message || errMsg;
+          } else if (res.status === 401) {
+            errMsg = 'Your session has expired. Please sign in again.';
+          } else {
+            errMsg = `Upload failed with status ${res.status}`;
+          }
+        } catch {
+          errMsg = `Upload failed with status ${res.status}`;
+        }
+        throw new Error(errMsg);
       }
 
       const data = await res.json();
@@ -1804,8 +1817,23 @@ export default function ClinicalPlatform() {
       });
 
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || 'File upload failed');
+        let errMsg = 'File upload failed';
+        try {
+          const contentType = res.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const errData = await res.json();
+            errMsg = errData.message || errMsg;
+          } else if (res.status === 401) {
+            errMsg = 'Your session has expired. Please sign in again.';
+          } else if (res.status === 413) {
+            errMsg = 'File size exceeds server upload limit.';
+          } else {
+            errMsg = `Upload failed with server status ${res.status}`;
+          }
+        } catch {
+          errMsg = `Upload failed with server status ${res.status}`;
+        }
+        throw new Error(errMsg);
       }
 
       const data = await res.json();
