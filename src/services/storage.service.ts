@@ -41,7 +41,7 @@ export class StorageService {
    * Prepends the 16-byte initialization vector (IV) to the start of the payload.
    */
   private encryptFile(buffer: Buffer): Buffer {
-    const rawKey = process.env.ENCRYPTION_KEY || '32byteencryptkeyforhosplymessage';
+    const rawKey = process.env.ENCRYPTION_KEY || 'b495b76a3b357ecdd22e9f8837b7948f8a3bc83a42dc4cadd16b44c35ca6f92e';
     const keyBuffer = crypto.createHash('sha256').update(rawKey).digest();
     
     const iv = crypto.randomBytes(16);
@@ -57,7 +57,7 @@ export class StorageService {
    * Extracts the first 16-bytes as the IV, and decodes the rest back to the original file.
    */
   private decryptFile(encryptedBuffer: Buffer): Buffer {
-    const rawKey = process.env.ENCRYPTION_KEY || '32byteencryptkeyforhosplymessage';
+    const rawKey = process.env.ENCRYPTION_KEY || 'b495b76a3b357ecdd22e9f8837b7948f8a3bc83a42dc4cadd16b44c35ca6f92e';
     const keyBuffer = crypto.createHash('sha256').update(rawKey).digest();
     
     const iv = encryptedBuffer.subarray(0, 16);

@@ -14,7 +14,7 @@ async function testUpload() {
 
   const token = jwt.sign(
     { sub: user.id, username: user.username, role: 'Doctor' },
-    'hosply_super_secret_jwt_key_2026_clinical_collaboration'
+    'BJPP2YFUYYflkCr2+UytF+Q4QHDF10d/91u5ACU95Qo='
   );
 
   const formData = new FormData();

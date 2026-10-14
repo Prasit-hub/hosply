@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-cbc';
-const rawKey = process.env.ENCRYPTION_KEY || '32byteencryptkeyforhosplymessage';
+const rawKey = process.env.ENCRYPTION_KEY || 'b495b76a3b357ecdd22e9f8837b7948f8a3bc83a42dc4cadd16b44c35ca6f92e';
 // Guarantee a perfect 32-byte key buffer using SHA-256 hashing
 const KEY_BUFFER = crypto.createHash('sha256').update(rawKey).digest();
 
