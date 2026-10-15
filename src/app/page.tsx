@@ -42,7 +42,9 @@ import {
   Camera,
   UploadCloud,
   Undo2,
-  RotateCcw
+  RotateCcw,
+  UserMinus,
+  Power
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
@@ -116,6 +118,7 @@ interface ChatRoom {
   name: string;
   type: 'DIRECT' | 'GROUP' | 'PATIENT_CONTEXT';
   patientContext?: PatientContext;
+  isActive?: boolean;
   lastReadAt?: string;
   roleInRoom?: string;
   members?: any[];
@@ -213,6 +216,22 @@ const translations = {
     purgeForAll: 'Purge All Messages for Everyone (Admin)',
     leaveGroup: 'Leave Group',
     inviteStaff: 'Invite Staff to Group',
+    
+    // Group Management
+    groupManagementTitle: 'Group Chat Administration',
+    manageGroupsTab: 'Group Management',
+    statusActive: 'Active',
+    statusInactive: 'Inactive',
+    deactivateGroup: 'Deactivate Group',
+    activateGroup: 'Activate Group',
+    groupDeactivatedToast: 'Group chat deactivated',
+    groupActivatedToast: 'Group chat activated',
+    removeMember: 'Remove Member',
+    memberRemovedToast: 'Member removed from group',
+    groupInactiveBanner: 'This group chat has been marked inactive by an administrator. Regular members cannot send messages.',
+    reactivateBtn: 'Reactivate Group',
+    groupMembersTitle: 'Group Members',
+    manageMembersBtn: 'Manage Members',
     
     // Profile Settings
     profileTitle: 'Professional Profile Settings',
@@ -357,6 +376,22 @@ const translations = {
     purgeForAll: 'ล้างข้อความทั้งหมดสำหรับทุกคน (ผู้ดูแลระบบ)',
     leaveGroup: 'ออกจากกลุ่มแชท',
     inviteStaff: 'เชิญบุคลากรเข้ากลุ่ม',
+    
+    // Group Management
+    groupManagementTitle: 'ระบบจัดการกลุ่มแชต',
+    manageGroupsTab: 'จัดการกลุ่มแชต',
+    statusActive: 'เปิดใช้งาน (Active)',
+    statusInactive: 'ปิดใช้งาน (Inactive)',
+    deactivateGroup: 'ปิดใช้งานกลุ่ม',
+    activateGroup: 'เปิดใช้งานกลุ่ม',
+    groupDeactivatedToast: 'ปิดใช้งานกลุ่มแชตเรียบร้อย',
+    groupActivatedToast: 'เปิดใช้งานกลุ่มแชตเรียบร้อย',
+    removeMember: 'ดึงออกจากกลุ่ม',
+    memberRemovedToast: 'ดึงสมาชิกออกจากกลุ่มเรียบร้อย',
+    groupInactiveBanner: 'กลุ่มแชตนี้ถูกปิดการใช้งาน (Inactive) โดยผู้ดูแลระบบ สมาชิกทั่วไปไม่สามารถส่งข้อความได้',
+    reactivateBtn: 'เปิดใช้งานกลุ่มอีกครั้ง',
+    groupMembersTitle: 'รายชื่อสมาชิกในกลุ่ม',
+    manageMembersBtn: 'จัดการสมาชิก',
     
     // Profile Settings
     profileTitle: 'ตั้งค่าโปรไฟล์วิชาชีพ',
@@ -688,9 +723,16 @@ export default function ClinicalPlatform() {
   const [activeSessionsCount, setActiveSessionsCount] = useState(48);
 
   // Admin User Maintenance States
-  const [adminSubTab, setAdminSubTab] = useState<'compliance' | 'users'>('compliance');
+  const [adminSubTab, setAdminSubTab] = useState<'compliance' | 'users' | 'groups'>('compliance');
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [adminRoles, setAdminRoles] = useState<any[]>([]);
+  
+  // Admin Group Management States
+  const [adminGroups, setAdminGroups] = useState<any[]>([]);
+  const [adminGroupSearch, setAdminGroupSearch] = useState('');
+  const [adminGroupFilter, setAdminGroupFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [showRoomMembersModal, setShowRoomMembersModal] = useState(false);
+  const [roomMembersModalTarget, setRoomMembersModalTarget] = useState<any | null>(null);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState('');
@@ -1026,6 +1068,7 @@ export default function ClinicalPlatform() {
     if (currentUser.role === 'Admin') {
       fetchAdminUsers();
       fetchAdminRoles();
+      fetchAdminGroups();
     }
 
     // Socket.io initialization
@@ -1205,6 +1248,47 @@ export default function ClinicalPlatform() {
       }
       fetchRooms();
       showToast('Room chat history was purged by administrator', 'info');
+    });
+
+    socket.on('roomStatusUpdated', (data: { roomId: string; isActive: boolean; roomName?: string }) => {
+      setRooms((prev) => prev.map((r) => r.id === data.roomId ? { ...r, isActive: data.isActive } : r));
+      if (activeRoomRef.current?.id === data.roomId) {
+        setActiveRoom((prev) => prev ? { ...prev, isActive: data.isActive } : null);
+      }
+      setAdminGroups((prev) => prev.map((g) => g.id === data.roomId ? { ...g, isActive: data.isActive } : g));
+      showToast(`สถานะกลุ่มแชตถูกปรับเป็น ${data.isActive ? 'เปิดใช้งาน (Active)' : 'ปิดใช้งาน (Inactive)'}`, 'info');
+    });
+
+    socket.on('roomRemoved', (data: { roomId: string; message: string }) => {
+      showToast(data.message || 'คุณถูกนำออกจากกลุ่มแชตนี้แล้ว', 'info');
+      if (activeRoomRef.current?.id === data.roomId) {
+        setActiveRoom(null);
+      }
+      fetchRooms();
+    });
+
+    socket.on('roomMemberRemoved', (data: { roomId: string; removedUserId: string }) => {
+      if (activeRoomRef.current?.id === data.roomId) {
+        setActiveRoom((prev) => prev ? {
+          ...prev,
+          members: (prev.members || []).filter((m: any) => (m.userId || m.user?.id) !== data.removedUserId),
+        } : null);
+      }
+      setRooms((prev) => prev.map((r) => r.id === data.roomId ? {
+        ...r,
+        members: (r.members || []).filter((m: any) => (m.userId || m.user?.id) !== data.removedUserId),
+      } : r));
+      setAdminGroups((prev) => prev.map((g) => g.id === data.roomId ? {
+        ...g,
+        members: (g.members || []).filter((m: any) => (m.userId || m.user?.id) !== data.removedUserId),
+      } : g));
+    });
+
+    socket.on('roomMembersUpdated', () => {
+      fetchRooms();
+      if (currentUser?.role === 'Admin') {
+        fetchAdminGroups();
+      }
     });
 
     socket.on('error', (err: any) => {
@@ -1869,6 +1953,88 @@ export default function ClinicalPlatform() {
     }
   };
 
+  const fetchAdminGroups = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/rooms/admin/list`, {
+        headers: { Authorization: `Bearer ${currentUser?.accessToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAdminGroups(data.rooms || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch admin groups:', e);
+    }
+  };
+
+  const handleToggleRoomActive = async (roomId: string, currentActive: boolean) => {
+    const nextActive = !currentActive;
+    const confirmMsg = nextActive
+      ? (language === 'TH' ? 'ต้องการเปิดใช้งานกลุ่มแชตนี้ใช่หรือไม่?' : 'Do you want to reactivate this group chat?')
+      : (language === 'TH' ? 'ต้องการปิดใช้งานกลุ่มแชตนี้ใช่หรือไม่? สมาชิกทั่วไปจะไม่สามารถส่งข้อความได้' : 'Do you want to deactivate this group chat? Regular members will not be able to send messages.');
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/rooms/${roomId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${currentUser?.accessToken}`,
+        },
+        body: JSON.stringify({ isActive: nextActive }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Failed to update group status');
+      }
+      showToast(nextActive ? translations[language].groupActivatedToast : translations[language].groupDeactivatedToast, 'success');
+      setAdminGroups((prev) => prev.map((g) => g.id === roomId ? { ...g, isActive: nextActive } : g));
+      setRooms((prev) => prev.map((r) => r.id === roomId ? { ...r, isActive: nextActive } : r));
+      if (activeRoom?.id === roomId) {
+        setActiveRoom((prev) => prev ? { ...prev, isActive: nextActive } : null);
+      }
+      if (roomMembersModalTarget?.id === roomId) {
+        setRoomMembersModalTarget((prev: any) => prev ? { ...prev, isActive: nextActive } : null);
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Error updating group status', 'error');
+    }
+  };
+
+  const handleRemoveMember = async (roomId: string, targetUserId: string, targetName: string) => {
+    const confirmMsg = language === 'TH'
+      ? `คุณต้องการดึง ${targetName} ออกจากกลุ่มแชตใช่หรือไม่?`
+      : `Are you sure you want to remove ${targetName} from the group?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/rooms/${roomId}/members`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${currentUser?.accessToken}`,
+        },
+        body: JSON.stringify({ userId: targetUserId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Failed to remove member');
+      }
+      showToast(translations[language].memberRemovedToast, 'success');
+      const filterMembers = (members: any[]) => (members || []).filter((m: any) => (m.userId || m.user?.id) !== targetUserId);
+      if (activeRoom?.id === roomId) {
+        setActiveRoom((prev) => prev ? { ...prev, members: filterMembers(prev.members || []) } : null);
+      }
+      if (roomMembersModalTarget?.id === roomId) {
+        setRoomMembersModalTarget((prev: any) => prev ? { ...prev, members: filterMembers(prev.members || []) } : null);
+      }
+      setAdminGroups((prev) => prev.map((g) => g.id === roomId ? { ...g, members: filterMembers(g.members || []) } : g));
+      setRooms((prev) => prev.map((r) => r.id === roomId ? { ...r, members: filterMembers(r.members || []) } : r));
+    } catch (err: any) {
+      showToast(err.message || 'Error removing member', 'error');
+    }
+  };
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -2230,8 +2396,32 @@ export default function ClinicalPlatform() {
       const data = await res.json();
       showToast(`Success: ${data.message}`, 'success');
 
-      // Refresh room list
+      // Refresh room list & admin groups
       await fetchRooms();
+      if (currentUser?.role === 'Admin') {
+        fetchAdminGroups();
+      }
+
+      if (data.addedMembers && inviteTargetRoom) {
+        const newMembers = data.addedMembers.map((u: any) => ({
+          roomId: inviteTargetRoom.id,
+          userId: u.id,
+          role: 'MEMBER',
+          user: u,
+        }));
+        if (roomMembersModalTarget && roomMembersModalTarget.id === inviteTargetRoom.id) {
+          setRoomMembersModalTarget((prev: any) => prev ? {
+            ...prev,
+            members: [...(prev.members || []), ...newMembers],
+          } : null);
+        }
+        if (activeRoom && activeRoom.id === inviteTargetRoom.id) {
+          setActiveRoom((prev) => prev ? {
+            ...prev,
+            members: [...(prev.members || []), ...newMembers],
+          } : null);
+        }
+      }
 
       // Close modal
       setShowInviteModal(false);
@@ -2244,6 +2434,11 @@ export default function ClinicalPlatform() {
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!messageInput.trim() && !selectedAttachmentFile) return;
+
+    if (activeRoom && activeRoom.isActive === false && currentUser?.role !== 'Admin') {
+      showToast(translations[language].groupInactiveBanner, 'error');
+      return;
+    }
 
     if (dlpBlockMessage) {
       showClinicalModal(
@@ -3407,6 +3602,15 @@ export default function ClinicalPlatform() {
                 >
                   User Maintenance
                 </button>
+                <button
+                  onClick={() => {
+                    setAdminSubTab('groups');
+                    fetchAdminGroups();
+                  }}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${adminSubTab === 'groups' ? 'bg-teal-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                >
+                  {translations[language].manageGroupsTab}
+                </button>
               </div>
             </div>
 
@@ -3536,7 +3740,7 @@ export default function ClinicalPlatform() {
                   </div>
                 </div>
               </>
-            ) : (() => {
+            ) : adminSubTab === 'users' ? (() => {
               const filteredUsers = adminUsers.filter((u) => {
                 const query = userSearchQuery.toLowerCase();
                 return (
@@ -3740,7 +3944,187 @@ export default function ClinicalPlatform() {
                   </div>
                 </div>
               );
-            })()}
+            })() : (
+              /* --- GROUP MANAGEMENT SUBTAB --- */
+              <div className="space-y-4">
+                {/* Search & Filter Header */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                  <div className="relative flex-1 max-w-md w-full">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder={language === 'TH' ? 'ค้นหาชื่อกลุ่ม หรือ HN ผู้ป่วย...' : 'Search group name or patient HN...'}
+                      value={adminGroupSearch}
+                      onChange={(e) => setAdminGroupSearch(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="flex bg-slate-950 border border-slate-800 p-1 rounded-lg text-xs font-bold">
+                      <button
+                        onClick={() => setAdminGroupFilter('ALL')}
+                        className={`px-3 py-1 rounded transition-all ${adminGroupFilter === 'ALL' ? 'bg-teal-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        {language === 'TH' ? 'ทั้งหมด' : 'All'}
+                      </button>
+                      <button
+                        onClick={() => setAdminGroupFilter('ACTIVE')}
+                        className={`px-3 py-1 rounded transition-all ${adminGroupFilter === 'ACTIVE' ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        {language === 'TH' ? 'ใช้งานอยู่' : 'Active'}
+                      </button>
+                      <button
+                        onClick={() => setAdminGroupFilter('INACTIVE')}
+                        className={`px-3 py-1 rounded transition-all ${adminGroupFilter === 'INACTIVE' ? 'bg-rose-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        {language === 'TH' ? 'ปิดใช้งาน' : 'Inactive'}
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={fetchAdminGroups}
+                      className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 p-2 rounded-lg transition-all"
+                      title="Refresh Groups"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Groups Table */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-950/70 border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                      <tr>
+                        <th className="px-6 py-3.5">ชื่อกลุ่มแชต (Group Name)</th>
+                        <th className="px-6 py-3.5">ประเภท (Type)</th>
+                        <th className="px-6 py-3.5">สมาชิก (Members)</th>
+                        <th className="px-6 py-3.5">สถานะ (Status)</th>
+                        <th className="px-6 py-3.5 text-right">การจัดการ (Actions)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {adminGroups
+                        .filter((g) => {
+                          const query = adminGroupSearch.toLowerCase();
+                          const matchesQuery = (g.name || '').toLowerCase().includes(query) || (g.patientContext?.hn || '').toLowerCase().includes(query);
+                          const matchesFilter =
+                            adminGroupFilter === 'ALL'
+                              ? true
+                              : adminGroupFilter === 'ACTIVE'
+                              ? g.isActive !== false
+                              : g.isActive === false;
+                          return matchesQuery && matchesFilter;
+                        })
+                        .map((g) => {
+                          const isRoomActive = g.isActive !== false;
+                          return (
+                            <tr key={g.id} className="hover:bg-slate-800/40 transition-colors">
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="h-9 w-9 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-400 flex items-center justify-center font-black text-sm">
+                                    {(g.name || 'G')[0]}
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-white text-xs leading-tight">{g.name || 'Unnamed Room'}</p>
+                                    {g.patientContext && (
+                                      <p className="text-[10px] text-sky-400 font-mono mt-0.5">HN: {g.patientContext.hn}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider border ${
+                                  g.type === 'DIRECT'
+                                    ? 'bg-slate-800 border-slate-700 text-slate-400'
+                                    : g.type === 'PATIENT_CONTEXT'
+                                    ? 'bg-sky-950/60 border-sky-800/60 text-sky-300'
+                                    : 'bg-teal-950/60 border-teal-800/60 text-teal-300'
+                                }`}>
+                                  {g.type}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex -space-x-1.5 overflow-hidden">
+                                    {(g.members || []).slice(0, 4).map((m: any) => (
+                                      <div key={m.userId || m.user?.id} className="h-6 w-6 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center font-bold text-[8px] text-white uppercase overflow-hidden shrink-0">
+                                        {m.user?.avatarUrl ? (
+                                          <img src={m.user.avatarUrl} alt="avatar" className="h-full w-full object-cover" />
+                                        ) : (
+                                          (m.user?.firstName || 'U')[0]
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <span className="text-slate-400 font-bold text-[11px]">
+                                    {(g.members || []).length} {language === 'TH' ? 'คน' : 'members'}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                                  isRoomActive
+                                    ? 'bg-emerald-950/50 border-emerald-800/50 text-emerald-300'
+                                    : 'bg-rose-950/50 border-rose-800/50 text-rose-300'
+                                }`}>
+                                  <span className={`h-1.5 w-1.5 rounded-full ${isRoomActive ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                                  {isRoomActive ? translations[language].statusActive : translations[language].statusInactive}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    onClick={() => {
+                                      setRoomMembersModalTarget(g);
+                                      setShowRoomMembersModal(true);
+                                    }}
+                                    className="bg-slate-800 hover:bg-slate-700 text-teal-400 border border-slate-700 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shadow-sm"
+                                    title={translations[language].manageMembersBtn}
+                                  >
+                                    <Users className="h-3 w-3" />
+                                    <span>{translations[language].manageMembersBtn}</span>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setInviteTargetRoom(g);
+                                      setShowInviteModal(true);
+                                    }}
+                                    className="bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 border border-teal-500/30 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shadow-sm"
+                                    title={translations[language].inviteStaff}
+                                  >
+                                    <UserPlus className="h-3 w-3" />
+                                    <span>{translations[language].inviteMemberButton}</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleToggleRoomActive(g.id, isRoomActive)}
+                                    className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 border shadow-sm ${
+                                      isRoomActive
+                                        ? 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border-rose-800/50'
+                                        : 'bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border-emerald-800/50'
+                                    }`}
+                                  >
+                                    <Power className="h-3 w-3" />
+                                    <span>{isRoomActive ? translations[language].deactivateGroup : translations[language].activateGroup}</span>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      {adminGroups.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="text-center py-10 text-slate-500">
+                            {language === 'TH' ? 'ไม่มีกลุ่มแชตในระบบ' : 'No group chats found in system'}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         ) : activeTab === 'settings' ? (
           /* --- SETTINGS TAB --- */
@@ -4114,7 +4498,7 @@ export default function ClinicalPlatform() {
                         );
                       })}
                       {activeRoom.members.length > 10 && (
-                        <div title="View All Members" onClick={() => { /* View all members logic if needed */ }} className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center font-bold text-[9px] text-teal-400 cursor-pointer hover:bg-slate-700 transition-colors shadow-sm">
+                        <div title="View All Members" onClick={() => { setRoomMembersModalTarget(activeRoom); setShowRoomMembersModal(true); }} className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center font-bold text-[9px] text-teal-400 cursor-pointer hover:bg-slate-700 transition-colors shadow-sm">
                           +{activeRoom.members.length - 10}
                         </div>
                       )}
@@ -4122,16 +4506,30 @@ export default function ClinicalPlatform() {
                   )}
 
                   {activeRoom.type !== 'DIRECT' && (
-                    <button
-                      onClick={() => {
-                        setInviteTargetRoom(activeRoom);
-                        setShowInviteModal(true);
-                      }}
-                      className="bg-teal-500 hover:bg-teal-600 text-white text-[10px] font-black uppercase tracking-wider px-3.5 py-1.5 rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 shadow-md shrink-0 animate-fade-in"
-                    >
-                      <UserPlus className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">{translations[language].inviteMemberButton}</span>
-                    </button>
+                    <>
+                      <button
+                        onClick={() => {
+                          setRoomMembersModalTarget(activeRoom);
+                          setShowRoomMembersModal(true);
+                        }}
+                        className="bg-slate-800 hover:bg-slate-700 text-teal-400 border border-slate-700 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 shrink-0 shadow-sm"
+                        title={translations[language].manageMembersBtn}
+                      >
+                        <Users className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">{translations[language].manageMembersBtn}</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setInviteTargetRoom(activeRoom);
+                          setShowInviteModal(true);
+                        }}
+                        className="bg-teal-500 hover:bg-teal-600 text-white text-[10px] font-black uppercase tracking-wider px-3.5 py-1.5 rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 shadow-md shrink-0 animate-fade-in"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">{translations[language].inviteMemberButton}</span>
+                      </button>
+                    </>
                   )}
 
                   <button
@@ -4497,6 +4895,30 @@ export default function ClinicalPlatform() {
                   </div>
                 )}
 
+                {/* Inactive Room Banner */}
+                {activeRoom.isActive === false && (
+                  <div className="mb-3 bg-amber-950/40 border border-amber-800/60 rounded-xl p-3 flex items-center justify-between text-xs animate-fade-in shadow-md">
+                    <div className="flex items-center gap-2.5 text-amber-300">
+                      <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-amber-400" />
+                      <div>
+                        <p className="font-bold text-xs">{translations[language].groupInactiveBanner}</p>
+                        <p className="text-[10px] text-amber-400/80 mt-0.5">
+                          {language === 'TH' ? 'สถานะห้องถูกระงับชั่วคราว สามารถอ่านข้อความเก่าได้ แต่ไม่อนุญาตให้ส่งข้อความใหม่' : 'Room is temporarily inactive. History remains readable, but new messages cannot be sent.'}
+                        </p>
+                      </div>
+                    </div>
+                    {currentUser?.role === 'Admin' && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleRoomActive(activeRoom.id, false)}
+                        className="bg-teal-500 hover:bg-teal-600 text-white font-bold text-[10px] uppercase px-3.5 py-1.5 rounded-lg shrink-0 transition-all shadow-md ml-3"
+                      >
+                        {translations[language].reactivateBtn}
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <form onSubmit={handleSendMessage} className="space-y-3">
                   <div className="flex items-center justify-between bg-slate-900/80 border border-slate-700/60 rounded-xl px-4 py-2 text-xs">
                     <div className="flex items-center gap-2">
@@ -4583,13 +5005,14 @@ export default function ClinicalPlatform() {
                       type="text"
                       value={messageInput}
                       onChange={handleTypingEvent}
-                      placeholder={translations[language].messagePlaceholder}
-                      className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-teal-500/80 placeholder-slate-500 text-white font-medium"
+                      disabled={isUploadingFile || (activeRoom.isActive === false && currentUser?.role !== 'Admin')}
+                      placeholder={activeRoom.isActive === false && currentUser?.role !== 'Admin' ? (language === 'TH' ? 'กลุ่มนี้ถูกปิดการใช้งานโดยผู้ดูแลระบบ (ไม่สามารถส่งข้อความได้)' : 'This group is inactive (Messaging disabled)') : translations[language].messagePlaceholder}
+                      className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-teal-500/80 placeholder-slate-500 text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                     />
                     <button
                       type="submit"
-                      disabled={!!dlpBlockMessage || isUploadingFile || (!messageInput.trim() && !selectedAttachmentFile)}
-                      className={`p-3 bg-teal-500 hover:bg-teal-600 text-white rounded-xl transition-all shadow-md active:scale-95 ${dlpBlockMessage || isUploadingFile ? 'opacity-30 cursor-not-allowed' : ''
+                      disabled={!!dlpBlockMessage || isUploadingFile || (!messageInput.trim() && !selectedAttachmentFile) || (activeRoom.isActive === false && currentUser?.role !== 'Admin')}
+                      className={`p-3 bg-teal-500 hover:bg-teal-600 text-white rounded-xl transition-all shadow-md active:scale-95 ${dlpBlockMessage || isUploadingFile || (activeRoom.isActive === false && currentUser?.role !== 'Admin') ? 'opacity-30 cursor-not-allowed' : ''
                         }`}
                     >
                       <Send className="h-4.5 w-4.5" />
@@ -4830,6 +5253,139 @@ export default function ClinicalPlatform() {
               <span>{translations[language].leaveGroup}</span>
             </button>
           )}
+        </div>
+      )}
+
+      {/* --- ROOM MEMBERS MANAGEMENT MODAL --- */}
+      {showRoomMembersModal && roomMembersModalTarget && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-slate-900 border border-slate-800 max-w-lg w-full p-6 rounded-2xl space-y-4 shadow-2xl clinical-glow">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-400 flex items-center justify-center font-black text-md">
+                  {(roomMembersModalTarget.name || 'G')[0]}
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white tracking-tight flex items-center gap-2">
+                    {roomMembersModalTarget.name}
+                    <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${
+                      roomMembersModalTarget.isActive !== false
+                        ? 'bg-emerald-950/50 border-emerald-800 text-emerald-400'
+                        : 'bg-rose-950/50 border-rose-800 text-rose-400'
+                    }`}>
+                      {roomMembersModalTarget.isActive !== false ? translations[language].statusActive : translations[language].statusInactive}
+                    </span>
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    {translations[language].groupMembersTitle} ({(roomMembersModalTarget.members || []).length} {language === 'TH' ? 'สมาชิก' : 'members'})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowRoomMembersModal(false);
+                  setRoomMembersModalTarget(null);
+                }}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-all"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Quick Actions (Invite / Toggle Active) */}
+            <div className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
+              <button
+                onClick={() => {
+                  setInviteTargetRoom(roomMembersModalTarget);
+                  setShowInviteModal(true);
+                }}
+                className="bg-teal-500 hover:bg-teal-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 shadow-md"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                <span>{translations[language].inviteStaff}</span>
+              </button>
+
+              {currentUser?.role === 'Admin' && (
+                <button
+                  onClick={() => handleToggleRoomActive(roomMembersModalTarget.id, roomMembersModalTarget.isActive !== false)}
+                  className={`font-bold px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 border shadow-md ${
+                    roomMembersModalTarget.isActive !== false
+                      ? 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border-rose-800/50'
+                      : 'bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border-emerald-800/50'
+                  }`}
+                >
+                  <Power className="h-3.5 w-3.5" />
+                  <span>{roomMembersModalTarget.isActive !== false ? translations[language].deactivateGroup : translations[language].activateGroup}</span>
+                </button>
+              )}
+            </div>
+
+            {/* Members List */}
+            <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1 divide-y divide-slate-800/50">
+              {(roomMembersModalTarget.members || []).map((m: any) => {
+                const memUserId = m.userId || m.user?.id;
+                const isOnline = memUserId ? onlineUserIds.has(memUserId) : false;
+                const roleName = typeof m.user?.role === 'object' ? m.user?.role?.name : m.user?.role || 'Staff';
+                const isRoomAdmin = m.role === 'ADMIN';
+                const canRemove = (currentUser?.role === 'Admin' || roomMembersModalTarget.roleInRoom === 'ADMIN') && memUserId !== currentUser?.id;
+
+                return (
+                  <div key={memUserId} className="pt-2 flex items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative">
+                        <div className="h-8 w-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-[10px] text-white uppercase overflow-hidden">
+                          {m.user?.avatarUrl ? (
+                            <img src={m.user.avatarUrl} alt="avatar" className="h-full w-full object-cover" />
+                          ) : (
+                            (m.user?.firstName || 'U')[0]
+                          )}
+                        </div>
+                        <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-slate-900 ${
+                          isOnline ? 'bg-emerald-400' : 'bg-slate-500'
+                        }`} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-white text-xs leading-tight flex items-center gap-1.5">
+                          {m.user?.firstName} {m.user?.lastName}
+                          {isRoomAdmin && (
+                            <span className="bg-amber-950 text-amber-400 text-[8px] font-black uppercase px-1.5 py-0.2 rounded border border-amber-800/60">
+                              Host
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-medium">
+                          @{m.user?.username} • <span className="text-teal-400 font-bold">{getRoleLabel(roleName, language)}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {canRemove && (
+                      <button
+                        onClick={() => handleRemoveMember(roomMembersModalTarget.id, memUserId, `${m.user?.firstName} ${m.user?.lastName}`)}
+                        className="bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 hover:border-rose-700 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shadow-sm shrink-0"
+                        title={translations[language].removeMember}
+                      >
+                        <UserMinus className="h-3 w-3" />
+                        <span>{translations[language].removeMember}</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end border-t border-slate-800 pt-3">
+              <button
+                onClick={() => {
+                  setShowRoomMembersModal(false);
+                  setRoomMembersModalTarget(null);
+                }}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-xs font-bold transition-all"
+              >
+                {translations[language].cancelBtn}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

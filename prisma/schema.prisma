@@ -48,6 +48,7 @@ model ChatRoom {
   name             String?      // Nullable for 1-on-1 DM
   type             String       // 'DIRECT', 'GROUP', 'PATIENT_CONTEXT'
   patientContextId String?      @unique
+  isActive         Boolean      @default(true)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 

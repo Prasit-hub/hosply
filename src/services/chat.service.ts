@@ -468,6 +468,22 @@ export class ChatService {
       throw new Error('You are not a member of this chat room');
     }
 
+    // 1.1 Verify room is active (inactive rooms allow only Admin messages)
+    const room = await prisma.chatRoom.findUnique({
+      where: { id: roomId },
+      select: { isActive: true, name: true },
+    });
+    if (room && !room.isActive) {
+      const senderUser = await prisma.user.findUnique({
+        where: { id: senderId },
+        include: { role: true },
+      });
+      const isSystemAdmin = senderUser?.role?.name?.toLowerCase() === 'admin';
+      if (!isSystemAdmin) {
+        throw new Error('กลุ่มแชตนี้ถูกปิดการใช้งาน (Inactive) โดยผู้ดูแลระบบ สมาชิกทั่วไปไม่สามารถส่งข้อความได้');
+      }
+    }
+
     // 2. DLP Content scan
     const dlpResult = dlpService.analyze(content);
     if (dlpResult.flagged) {
@@ -567,12 +583,19 @@ export class ChatService {
   }
 
   async addRoomMembers(roomId: string, memberIds: string[], inviterId: string) {
-    // 1. Verify that the inviter is a member of the room
+    // 1. Verify that the inviter is a member of the room OR has Admin role
     const isInviterMember = await prisma.roomMember.findUnique({
       where: { roomId_userId: { roomId, userId: inviterId } },
     });
-    if (!isInviterMember) {
-      throw new Error('You are not a member of this chat room');
+
+    const inviterUser = await prisma.user.findUnique({
+      where: { id: inviterId },
+      include: { role: true },
+    });
+    const isSystemAdmin = inviterUser?.role?.name?.toLowerCase() === 'admin';
+
+    if (!isInviterMember && !isSystemAdmin) {
+      throw new Error('You are not authorized to invite members to this chat room');
     }
 
     // 2. Verify all new member IDs exist
@@ -659,6 +682,176 @@ export class ChatService {
     });
 
     return { message: 'Successfully left the room' };
+  }
+
+  async removeRoomMember(roomId: string, targetUserId: string, operatorId: string) {
+    // 1. Check if room exists
+    const room = await prisma.chatRoom.findUnique({
+      where: { id: roomId },
+      include: { members: true },
+    });
+    if (!room) {
+      throw new Error('Chat room not found');
+    }
+
+    // 2. Check operator permissions: must be System Admin or Room Admin
+    const operatorUser = await prisma.user.findUnique({
+      where: { id: operatorId },
+      include: { role: true },
+    });
+    const isSystemAdmin = operatorUser?.role?.name?.toLowerCase() === 'admin';
+
+    const operatorMembership = await prisma.roomMember.findUnique({
+      where: { roomId_userId: { roomId, userId: operatorId } },
+    });
+    const isRoomAdmin = operatorMembership?.role === 'ADMIN';
+
+    if (!isSystemAdmin && !isRoomAdmin) {
+      throw new Error('Only administrators or room owners are authorized to remove members');
+    }
+
+    // 3. Verify target user is in the room
+    const targetMembership = await prisma.roomMember.findUnique({
+      where: { roomId_userId: { roomId, userId: targetUserId } },
+      include: { user: true },
+    });
+    if (!targetMembership) {
+      throw new Error('User is not a member of this chat room');
+    }
+
+    // 4. Delete room membership
+    await prisma.roomMember.delete({
+      where: { roomId_userId: { roomId, userId: targetUserId } },
+    });
+
+    // 5. Log audit trail
+    await auditService.log({
+      userId: operatorId,
+      action: 'ROOM_MEMBER_REMOVED',
+      entity: 'ChatRoom',
+      entityId: roomId,
+      details: {
+        removedUserId: targetUserId,
+        removedUsername: targetMembership.user.username,
+        operatorId,
+      },
+    });
+
+    return {
+      message: 'Member successfully removed from room',
+      removedUserId: targetUserId,
+      targetUsername: targetMembership.user.username,
+    };
+  }
+
+  async updateRoomStatus(roomId: string, isActive: boolean, operatorId: string) {
+    // 1. Verify operator is system Admin
+    const operatorUser = await prisma.user.findUnique({
+      where: { id: operatorId },
+      include: { role: true },
+    });
+    const isSystemAdmin = operatorUser?.role?.name?.toLowerCase() === 'admin';
+
+    const operatorMembership = await prisma.roomMember.findUnique({
+      where: { roomId_userId: { roomId, userId: operatorId } },
+    });
+    const isRoomAdmin = operatorMembership?.role === 'ADMIN';
+
+    if (!isSystemAdmin && !isRoomAdmin) {
+      throw new Error('Only administrators are authorized to change group chat status');
+    }
+
+    const updatedRoom = await prisma.chatRoom.update({
+      where: { id: roomId },
+      data: { isActive },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+                avatarUrl: true,
+                role: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Log audit trail
+    await auditService.log({
+      userId: operatorId,
+      action: isActive ? 'ROOM_ACTIVATED' : 'ROOM_DEACTIVATED',
+      entity: 'ChatRoom',
+      entityId: roomId,
+      details: {
+        isActive,
+        roomName: updatedRoom.name,
+      },
+    });
+
+    return {
+      ...updatedRoom,
+      members: updatedRoom.members.map(rm => ({
+        ...rm,
+        user: {
+          ...rm.user,
+          firstName: decrypt(rm.user.firstName),
+          lastName: decrypt(rm.user.lastName),
+        },
+      })),
+    };
+  }
+
+  async getAllRoomsForAdmin(operatorId: string) {
+    // Verify system admin
+    const operatorUser = await prisma.user.findUnique({
+      where: { id: operatorId },
+      include: { role: true },
+    });
+    if (operatorUser?.role?.name?.toLowerCase() !== 'admin') {
+      throw new Error('Only system administrators can access full group directory');
+    }
+
+    const rooms = await prisma.chatRoom.findMany({
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+                avatarUrl: true,
+                role: { select: { name: true } },
+              },
+            },
+          },
+        },
+        patientContext: true,
+        _count: {
+          select: { messages: true, members: true },
+        },
+      },
+    });
+
+    return rooms.map(r => ({
+      ...r,
+      members: r.members.map(rm => ({
+        ...rm,
+        user: {
+          ...rm.user,
+          firstName: decrypt(rm.user.firstName),
+          lastName: decrypt(rm.user.lastName),
+        },
+      })),
+    }));
   }
 }
 
