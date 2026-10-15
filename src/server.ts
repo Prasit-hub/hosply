@@ -5,6 +5,7 @@ import { Server, Socket } from 'socket.io';
 import * as jwt from 'jsonwebtoken';
 import { prisma } from './lib/db';
 import { chatService } from './services/chat.service';
+import { decrypt } from './common/utils/crypto';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -31,6 +32,10 @@ app.prepare().then(() => {
   });
 
   (global as any).io = io;
+  (process as any).io = io;
+  const onlineUserSockets = new Map<string, Set<string>>();
+  (global as any).onlineUserSockets = onlineUserSockets;
+  (process as any).onlineUserSockets = onlineUserSockets;
 
   // Authentication Middleware for Socket.IO
   io.use(async (socket: Socket, nextFn) => {
@@ -63,8 +68,8 @@ app.prepare().then(() => {
       socket.data.user = {
         id: user.id,
         username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        firstName: decrypt(user.firstName),
+        lastName: decrypt(user.lastName),
         role: user.role.name,
       };
 
@@ -80,6 +85,13 @@ app.prepare().then(() => {
     const user = socket.data.user;
     
     if (user) {
+      if (!onlineUserSockets.has(user.id)) {
+        onlineUserSockets.set(user.id, new Set());
+      }
+      const userSockets = onlineUserSockets.get(user.id)!;
+      const isFirstConnection = userSockets.size === 0;
+      userSockets.add(socket.id);
+
       socket.join(`user_${user.id}`);
       console.log(`[Socket] User ${user.username} joined personal room: user_${user.id}`);
 
@@ -96,6 +108,24 @@ app.prepare().then(() => {
       } catch (err) {
         console.error('[Socket] Failed to auto-join rooms on connection:', err);
       }
+
+      // Broadcast online status if first socket connection for this user
+      if (isFirstConnection) {
+        io.emit('userPresence', {
+          userId: user.id,
+          username: user.username,
+          status: 'online',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Send the complete active online user list to the connected client
+      const currentOnlineIds = Array.from(onlineUserSockets.keys()).filter(
+        (id) => (onlineUserSockets.get(id)?.size || 0) > 0
+      );
+      socket.emit('onlineUsersList', {
+        userIds: currentOnlineIds,
+      });
     }
 
     socket.on('joinRoom', async (data: { roomId: string }) => {
@@ -222,16 +252,44 @@ app.prepare().then(() => {
       if (!user) return;
 
       socket.to(`room_${data.roomId}`).emit('userTyping', {
+        roomId: data.roomId,
         userId: user.id,
         username: user.username,
         firstName: user.firstName,
+        lastName: user.lastName,
         isTyping: data.isTyping,
       });
+    });
+
+    socket.on('userLogout', () => {
+      if (user) {
+        onlineUserSockets.delete(user.id);
+        io.emit('userPresence', {
+          userId: user.id,
+          username: user.username,
+          status: 'offline',
+          timestamp: new Date().toISOString(),
+        });
+        console.log(`[Socket] User explicitly logged out: ${user.username}`);
+      }
     });
 
     socket.on('disconnect', () => {
       if (user) {
         console.log(`[Socket] Client disconnected: ${user.username} (${socket.id})`);
+        const userSockets = onlineUserSockets.get(user.id);
+        if (userSockets) {
+          userSockets.delete(socket.id);
+          if (userSockets.size === 0) {
+            onlineUserSockets.delete(user.id);
+            io.emit('userPresence', {
+              userId: user.id,
+              username: user.username,
+              status: 'offline',
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
       }
     });
   });

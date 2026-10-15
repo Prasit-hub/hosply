@@ -349,11 +349,13 @@ export class ChatService {
         },
       });
 
-      if (existingRoom) return existingRoom;
+      if (existingRoom) {
+        return this.getFullDecryptedRoom(existingRoom.id, creatorId);
+      }
     }
 
     // Create Transaction
-    return prisma.$transaction(async (tx) => {
+    const room = await prisma.$transaction(async (tx) => {
       let patientContextId: string | undefined;
 
       if (dto.type === 'PATIENT_CONTEXT' && dto.patientHn) {
@@ -367,7 +369,7 @@ export class ChatService {
         patientContextId = patient.id;
       }
 
-      const room = await tx.chatRoom.create({
+      const created = await tx.chatRoom.create({
         data: {
           name: dto.name || null,
           type: dto.type,
@@ -393,7 +395,7 @@ export class ChatService {
         allMemberIds.map(id =>
           tx.roomMember.create({
             data: {
-              roomId: room.id,
+              roomId: created.id,
               userId: id,
               role: id === creatorId ? 'ADMIN' : 'MEMBER',
               lastReadAt: id === creatorId ? new Date() : new Date(0),
@@ -402,8 +404,59 @@ export class ChatService {
         )
       );
 
-      return room;
+      return created;
     });
+
+    return this.getFullDecryptedRoom(room.id, creatorId);
+  }
+
+  async getFullDecryptedRoom(roomId: string, viewerUserId: string) {
+    const fullRoom = await prisma.chatRoom.findUnique({
+      where: { id: roomId },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+                avatarUrl: true,
+                role: { select: { name: true } },
+              },
+            },
+          },
+        },
+        patientContext: true,
+      },
+    });
+
+    if (!fullRoom) throw new Error('Room not found');
+
+    let roomName = fullRoom.name;
+    if (fullRoom.type === 'DIRECT') {
+      const otherMember = fullRoom.members.find(rm => rm.userId !== viewerUserId);
+      if (otherMember) {
+        roomName = `${decrypt(otherMember.user.firstName)} ${decrypt(otherMember.user.lastName)} (${otherMember.user.role.name})`;
+      }
+    }
+
+    const decryptedMembers = fullRoom.members.map(rm => ({
+      ...rm,
+      user: {
+        ...rm.user,
+        firstName: decrypt(rm.user.firstName),
+        lastName: decrypt(rm.user.lastName),
+        avatarUrl: rm.user.avatarUrl || null,
+      },
+    }));
+
+    return {
+      ...fullRoom,
+      name: roomName,
+      members: decryptedMembers,
+    };
   }
 
   async sendMessage(roomId: string, senderId: string, content: string, classification = 'INTERNAL', ipAddress?: string, messageId?: string) {

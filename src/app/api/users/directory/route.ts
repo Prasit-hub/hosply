@@ -29,13 +29,16 @@ export async function GET(req: Request) {
       },
     });
 
-    const result = users.map(u => ({
+    const onlineUserSockets = ((process as any).onlineUserSockets || (global as any).onlineUserSockets) as Map<string, Set<string>> | undefined;
+
+    const result = users.map((u: any) => ({
       id: u.id,
       username: u.username,
       firstName: decrypt(u.firstName),
       lastName: decrypt(u.lastName),
-      role: u.role.name,
+      role: u.role?.name || u.role || 'Staff',
       avatarUrl: u.avatarUrl || null,
+      isOnline: Boolean(onlineUserSockets?.has(u.id) && (onlineUserSockets.get(u.id)?.size || 0) > 0),
     }));
 
     return NextResponse.json(result);

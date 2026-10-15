@@ -2,6 +2,7 @@ import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcrypt';
 import { prisma } from '../lib/db';
 import { encrypt, decrypt } from '../common/utils/crypto';
+import { auditService } from './audit.service';
 
 export class AuthService {
   private readonly jwtSecret = (process.env.JWT_SECRET && process.env.JWT_SECRET !== 'undefined' && process.env.JWT_SECRET !== 'null')
@@ -201,6 +202,16 @@ export class AuthService {
 
     if (!user || !user.isActive) {
       console.warn(`[Auth Service] Login failed: User "${username}" not found or inactive`);
+      await auditService.log({
+        action: 'LOGIN_FAILED',
+        entity: 'User',
+        details: {
+          attemptedUsername: username,
+          reason: !user ? 'User not found' : 'Account deactivated',
+        },
+        ipAddress,
+        userAgent,
+      });
       throw new Error('Invalid username or password');
     }
 
@@ -219,10 +230,37 @@ export class AuthService {
 
     if (!isMatch) {
       console.warn(`[Auth Service] Login failed: Incorrect password for "${username}"`);
+      await auditService.log({
+        userId: user.id,
+        action: 'LOGIN_FAILED',
+        entity: 'User',
+        entityId: user.id,
+        details: {
+          attemptedUsername: username,
+          reason: 'Incorrect password',
+        },
+        ipAddress,
+        userAgent,
+      });
       throw new Error('Invalid username or password');
     }
 
     console.log(`[Auth Service] Login successful for "${username}" (${user.role.name})`);
+
+    // Audit log successful login
+    await auditService.log({
+      userId: user.id,
+      action: 'LOGIN_SUCCESS',
+      entity: 'User',
+      entityId: user.id,
+      details: {
+        username: user.username,
+        role: user.role.name,
+        status: 'ONLINE',
+      },
+      ipAddress,
+      userAgent,
+    });
 
     const payload = { username: user.username, sub: user.id, role: user.role.name };
     const accessToken = jwt.sign(payload, this.jwtSecret, { expiresIn: '24h' });
@@ -292,11 +330,42 @@ export class AuthService {
     }
   }
 
-  async logout(refreshToken: string) {
+  async logout(refreshToken?: string, userId?: string, username?: string, ipAddress?: string, userAgent?: string) {
     try {
-      await prisma.session.deleteMany({
-        where: { refreshToken },
-      });
+      let targetUserId = userId;
+      let targetUsername = username;
+
+      if (refreshToken) {
+        if (!targetUserId || !targetUsername) {
+          try {
+            const payload = jwt.verify(refreshToken, this.jwtRefreshSecret) as any;
+            targetUserId = targetUserId || payload.sub;
+            targetUsername = targetUsername || payload.username;
+          } catch {
+            // Ignore token decode error
+          }
+        }
+
+        await prisma.session.deleteMany({
+          where: { refreshToken },
+        });
+      }
+
+      if (targetUserId || targetUsername) {
+        await auditService.log({
+          userId: targetUserId || undefined,
+          action: 'USER_LOGOUT',
+          entity: 'User',
+          entityId: targetUserId || undefined,
+          details: {
+            username: targetUsername || 'unknown',
+            status: 'OFFLINE',
+          },
+          ipAddress,
+          userAgent,
+        });
+      }
+
       return { success: true };
     } catch (e) {
       return { success: false };

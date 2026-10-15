@@ -284,7 +284,9 @@ const translations = {
     alreadyHaveAccount: 'Already have an account?',
     noAccountYet: "Don't have an account?",
     switchToLogin: 'Sign in here',
-    switchToRegister: 'Register here'
+    switchToRegister: 'Register here',
+    statusOnline: 'Online',
+    statusOffline: 'Offline',
   },
   TH: {
     // Login
@@ -412,7 +414,9 @@ const translations = {
     initRoomBtn: 'สร้างห้องสนทนา',
     directChatPrefix: '👤 ข้อความส่วนตัว (1-1)',
     patientChatPrefix: '🏥 ช่องทางเคสผู้ป่วย',
-    groupChatPrefix: '👥 ปรึกษาเคสกลุ่ม'
+    groupChatPrefix: '👥 ปรึกษาเคสกลุ่ม',
+    statusOnline: 'ออนไลน์',
+    statusOffline: 'ออฟไลน์',
   }
 };
 
@@ -669,6 +673,7 @@ export default function ClinicalPlatform() {
 
   // Directory and Chat Creation
   const [directoryUsers, setDirectoryUsers] = useState<any[]>([]);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
@@ -1041,6 +1046,22 @@ export default function ClinicalPlatform() {
       }
     });
 
+    socket.on('onlineUsersList', (data: { userIds: string[] }) => {
+      setOnlineUserIds(new Set(data.userIds || []));
+    });
+
+    socket.on('userPresence', (data: { userId: string; username: string; status: 'online' | 'offline' }) => {
+      setOnlineUserIds((prev) => {
+        const next = new Set(prev);
+        if (data.status === 'online') {
+          next.add(data.userId);
+        } else {
+          next.delete(data.userId);
+        }
+        return next;
+      });
+    });
+
     socket.on('newMessage', (msg: Message) => {
       const isMe = msg.sender.id === currentUser.id;
 
@@ -1139,13 +1160,21 @@ export default function ClinicalPlatform() {
     socket.on('userTyping', (data: any) => {
       if (data.isTyping) {
         setTypingUsers((prev) => {
-          if (prev.some((u) => u.userId === data.userId)) return prev;
-          return [...prev, data];
+          const filtered = prev.filter((u) => u.userId !== data.userId);
+          return [...filtered, { ...data, timestamp: Date.now() }];
         });
       } else {
         setTypingUsers((prev) => prev.filter((u) => u.userId !== data.userId));
       }
     });
+
+    const typingCleaner = setInterval(() => {
+      setTypingUsers((prev) => {
+        const now = Date.now();
+        const active = prev.filter((u) => !u.timestamp || now - u.timestamp < 5000);
+        return active.length === prev.length ? prev : active;
+      });
+    }, 2000);
 
     socket.on('messageUnsent', (data: { messageId: string; roomId: string; deletedAt?: string }) => {
       setMessages((prev) =>
@@ -1183,6 +1212,7 @@ export default function ClinicalPlatform() {
     });
 
     return () => {
+      clearInterval(typingCleaner);
       socket.disconnect();
     };
   }, [currentUser]);
@@ -1303,14 +1333,33 @@ export default function ClinicalPlatform() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const token = currentUser?.accessToken;
+    if (socketRef.current) {
+      socketRef.current.emit('userLogout');
+      socketRef.current.disconnect();
+    }
+    if (token) {
+      try {
+        fetch(`${API_URL}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ refreshToken: token }),
+        }).catch(() => {});
+      } catch (err) {
+        // ignore logout fetch error
+      }
+    }
     setCurrentUser(null);
     localStorage.removeItem('hosply_user_session');
     setRooms([]);
     setActiveRoom(null);
     setMessages([]);
+    setOnlineUserIds(new Set());
     hasInitialRoomLoadedRef.current = false;
-    socketRef.current?.disconnect();
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -1719,7 +1768,19 @@ export default function ClinicalPlatform() {
         headers: { Authorization: `Bearer ${currentUser?.accessToken}` },
       });
       if (res.ok) {
-        setDirectoryUsers(await res.json());
+        const users = await res.json();
+        setDirectoryUsers(users);
+        setOnlineUserIds((prev) => {
+          const next = new Set(prev);
+          users.forEach((u: any) => {
+            if (u.isOnline) {
+              next.add(u.id);
+            } else {
+              next.delete(u.id);
+            }
+          });
+          return next;
+        });
       } else throw new Error();
     } catch (e) {
       setDirectoryUsers([
@@ -3184,9 +3245,21 @@ export default function ClinicalPlatform() {
                       }`}>
                         {isDirect ? <User className="h-4 w-4" /> : <Users className="h-4 w-4" />}
                         {/* Status notification dot */}
-                        {room.unreadCount && room.unreadCount > 0 && (
+                        {room.unreadCount && room.unreadCount > 0 ? (
                           <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 animate-ping" />
-                        )}
+                        ) : isDirect ? (() => {
+                          const otherMember = (room.members || []).find((m: any) => {
+                            const mId = m.userId || m.user?.id;
+                            return mId && mId !== currentUser?.id;
+                          });
+                          const otherMemberId = otherMember ? (otherMember.userId || otherMember.user?.id) : null;
+                          const isPartnerOnline = otherMemberId ? onlineUserIds.has(otherMemberId) : false;
+                          return isPartnerOnline ? (
+                            <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-slate-900 animate-pulse" title={translations[language].statusOnline} />
+                          ) : (
+                            <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-slate-500 ring-1 ring-slate-900" title={translations[language].statusOffline} />
+                          );
+                        })() : null}
                       </div>
 
                       {/* Content block */}
@@ -3238,44 +3311,65 @@ export default function ClinicalPlatform() {
                 .filter((user) =>
                   `${user.firstName} ${user.lastName} ${user.role}`.toLowerCase().includes(chatSearchQuery.toLowerCase())
                 )
-                .map((user) => (
-                  <div
-                    key={user.id}
-                    className="p-3 rounded-xl bg-slate-800/30 border border-slate-800/80 hover:bg-slate-800/60 transition-all flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="h-8.5 w-8.5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold text-xs uppercase overflow-hidden shrink-0">
-                        {user.avatarUrl ? (
-                          <img
-                            src={user.avatarUrl}
-                            alt={user.firstName}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          user.firstName[0]
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-white">
-                          {user.firstName} {user.lastName}
-                        </p>
-                        <span className="text-[9px] text-teal-400 font-bold uppercase tracking-wider">{getRoleLabel(user.role, language)}</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        triggerCreateRoom({
-                          type: 'DIRECT',
-                          memberIds: [user.id],
-                          name: `${user.firstName} (DM)`,
-                        });
-                      }}
-                      className="bg-teal-500 hover:bg-teal-600 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg transition-all"
+                .map((user) => {
+                  const isUserOnline = onlineUserIds.has(user.id);
+                  return (
+                    <div
+                      key={user.id}
+                      className="p-3 rounded-xl bg-slate-800/30 border border-slate-800/80 hover:bg-slate-800/60 transition-all flex items-center justify-between"
                     >
-                      {translations[language].chatButton}
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-2.5">
+                        <div className="relative shrink-0">
+                          <div className="h-9 w-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold text-xs uppercase overflow-hidden shrink-0">
+                            {user.avatarUrl ? (
+                              <img
+                                src={user.avatarUrl}
+                                alt={user.firstName}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              user.firstName ? user.firstName[0] : 'U'
+                            )}
+                          </div>
+                          <span
+                            className={`absolute -bottom-0.5 -right-0.5 block h-2.5 w-2.5 rounded-full border-2 border-slate-900 ${
+                              isUserOnline ? 'bg-emerald-400 ring-1 ring-emerald-400/40' : 'bg-slate-500'
+                            }`}
+                            title={isUserOnline ? translations[language].statusOnline : translations[language].statusOffline}
+                          />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                            {user.firstName} {user.lastName}
+                            <span className="text-[10px] text-slate-400 font-mono font-normal">@{user.username}</span>
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[9px] text-teal-400 font-bold uppercase tracking-wider">{getRoleLabel(user.role, language)}</span>
+                            <span className="text-[9px] text-slate-600">•</span>
+                            <span className={`text-[9px] font-medium flex items-center gap-1 ${
+                              isUserOnline ? 'text-emerald-400' : 'text-slate-500'
+                            }`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${isUserOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+                              {isUserOnline ? translations[language].statusOnline : translations[language].statusOffline}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          triggerCreateRoom({
+                            type: 'DIRECT',
+                            memberIds: [user.id],
+                            name: `${user.firstName} (DM)`,
+                          });
+                        }}
+                        className="bg-teal-500 hover:bg-teal-600 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg transition-all"
+                      >
+                        {translations[language].chatButton}
+                      </button>
+                    </div>
+                  );
+                })}
             </>
           )}
         </div>
@@ -3399,7 +3493,13 @@ export default function ClinicalPlatform() {
                             <div className="space-y-1">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                  log.action.includes('BLOCK') ? 'bg-red-950 text-red-400 border border-red-800/60' : 'bg-slate-800 text-slate-300'
+                                  log.action.includes('BLOCK') || log.action.includes('FAILED')
+                                    ? 'bg-rose-950 text-rose-400 border border-rose-800/60'
+                                    : log.action.includes('LOGIN')
+                                    ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
+                                    : log.action.includes('LOGOUT')
+                                    ? 'bg-amber-950/40 text-amber-400 border border-amber-800/40'
+                                    : 'bg-slate-800 text-slate-300'
                                 }`}>
                                   {log.action}
                                 </span>
@@ -3906,35 +4006,83 @@ export default function ClinicalPlatform() {
                   </button>
 
                   {/* Glowing Status Avatar Ring */}
-                  <div className="relative">
-                    <div className="h-11 w-11 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-400 flex items-center justify-center font-black text-md shadow-md shadow-teal-500/10">
-                      {activeRoom.name[0]}
-                    </div>
-                    <span className="absolute -bottom-1 -right-1 block h-3.5 w-3.5 rounded-full bg-green-500 ring-2 ring-slate-900 animate-ping"></span>
-                    <span className="absolute -bottom-1 -right-1 block h-3.5 w-3.5 rounded-full bg-green-500 ring-2 ring-slate-900"></span>
-                  </div>
+                  {(() => {
+                    const otherMember = (activeRoom.members || []).find((m: any) => {
+                      const mId = m.userId || m.user?.id;
+                      return mId && mId !== currentUser?.id;
+                    });
+                    const otherMemberId = otherMember ? (otherMember.userId || otherMember.user?.id) : null;
+                    const isPartnerOnline = otherMemberId ? onlineUserIds.has(otherMemberId) : false;
+                    const groupOnlineCount = (activeRoom.members || []).filter((m: any) => {
+                      const mId = m.userId || m.user?.id;
+                      return mId && onlineUserIds.has(mId);
+                    }).length;
 
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] text-teal-400 font-black uppercase tracking-widest bg-teal-950/50 border border-teal-800/40 px-2 py-0.5 rounded-md">
-                        {activeRoom.type === 'DIRECT' ? translations[language].directChatPrefix : activeRoom.type === 'PATIENT_CONTEXT' ? translations[language].patientChatPrefix : translations[language].groupChatPrefix}
-                      </span>
-                      {activeRoom.type === 'PATIENT_CONTEXT' && activeRoom.patientContext && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="bg-sky-950 text-sky-400 font-mono text-[9px] px-1.5 py-0.5 rounded border border-sky-800/60 font-bold uppercase">
-                            HN: {activeRoom.patientContext.hn}
-                          </span>
-                          <span className="bg-emerald-950 text-emerald-400 text-[9px] px-1.5 py-0.5 rounded border border-emerald-800/60 font-bold uppercase">
-                            Active Stream
-                          </span>
+                    return (
+                      <>
+                        <div className="relative">
+                          <div className="h-11 w-11 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-400 flex items-center justify-center font-black text-md shadow-md shadow-teal-500/10">
+                            {activeRoom.name[0]}
+                          </div>
+                          {activeRoom.type === 'DIRECT' ? (
+                            isPartnerOnline ? (
+                              <>
+                                <span className="absolute -bottom-1 -right-1 block h-3.5 w-3.5 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-ping" />
+                                <span className="absolute -bottom-1 -right-1 block h-3.5 w-3.5 rounded-full bg-emerald-400 ring-2 ring-slate-900" />
+                              </>
+                            ) : (
+                              <span className="absolute -bottom-1 -right-1 block h-3.5 w-3.5 rounded-full bg-slate-500 ring-2 ring-slate-900" />
+                            )
+                          ) : (
+                            groupOnlineCount > 0 ? (
+                              <>
+                                <span className="absolute -bottom-1 -right-1 block h-3.5 w-3.5 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-ping" />
+                                <span className="absolute -bottom-1 -right-1 block h-3.5 w-3.5 rounded-full bg-emerald-400 ring-2 ring-slate-900" />
+                              </>
+                            ) : (
+                              <span className="absolute -bottom-1 -right-1 block h-3.5 w-3.5 rounded-full bg-slate-500 ring-2 ring-slate-900" />
+                            )
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <h3 className="text-base font-extrabold text-white tracking-tight mt-1 flex items-center gap-2">
-                      {activeRoom.name}
-                      <span className="h-2 w-2 rounded-full bg-green-500 inline-block animate-pulse" title="Connected to secure stream"></span>
-                    </h3>
-                  </div>
+
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] text-teal-400 font-black uppercase tracking-widest bg-teal-950/50 border border-teal-800/40 px-2 py-0.5 rounded-md">
+                              {activeRoom.type === 'DIRECT' ? translations[language].directChatPrefix : activeRoom.type === 'PATIENT_CONTEXT' ? translations[language].patientChatPrefix : translations[language].groupChatPrefix}
+                            </span>
+                            {activeRoom.type === 'PATIENT_CONTEXT' && activeRoom.patientContext && (
+                              <div className="flex items-center gap-1.5">
+                                <span className="bg-sky-950 text-sky-400 font-mono text-[9px] px-1.5 py-0.5 rounded border border-sky-800/60 font-bold uppercase">
+                                  HN: {activeRoom.patientContext.hn}
+                                </span>
+                                <span className="bg-emerald-950 text-emerald-400 text-[9px] px-1.5 py-0.5 rounded border border-emerald-800/60 font-bold uppercase">
+                                  Active Stream
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <h3 className="text-base font-extrabold text-white tracking-tight mt-1 flex items-center gap-2">
+                            {activeRoom.name}
+                            {activeRoom.type === 'DIRECT' ? (
+                              <span className={`text-[10px] font-semibold flex items-center gap-1 ${
+                                isPartnerOnline ? 'text-emerald-400' : 'text-slate-400'
+                              }`}>
+                                <span className={`h-2 w-2 rounded-full ${isPartnerOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                                {isPartnerOnline ? translations[language].statusOnline : translations[language].statusOffline}
+                              </span>
+                            ) : (
+                              <span className={`text-[10px] font-semibold flex items-center gap-1 ${
+                                groupOnlineCount > 0 ? 'text-emerald-400' : 'text-slate-400'
+                              }`}>
+                                <span className={`h-2 w-2 rounded-full ${groupOnlineCount > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                                {groupOnlineCount} {translations[language].statusOnline}
+                              </span>
+                            )}
+                          </h3>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* Right secure channel tags and avatars */}
@@ -3942,19 +4090,29 @@ export default function ClinicalPlatform() {
                   {/* Member Avatars */}
                   {activeRoom.members && activeRoom.type !== 'DIRECT' && (
                     <div className="flex items-center -space-x-2 mr-2">
-                      {activeRoom.members.slice(0, 10).map((m: any) => (
-                        <div key={m.userId} title={`${m.user.firstName} ${m.user.lastName} (${m.user.role.name})`} className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center font-bold text-[9px] text-white uppercase shadow-sm overflow-hidden shrink-0">
-                          {m.user.avatarUrl ? (
-                            <img
-                              src={m.user.avatarUrl}
-                              alt={m.user.firstName}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            m.user.firstName[0]
-                          )}
-                        </div>
-                      ))}
+                      {activeRoom.members.slice(0, 10).map((m: any) => {
+                        const mId = m.userId || m.user?.id;
+                        const isMemOnline = mId && onlineUserIds.has(mId);
+                        const roleName = typeof m.user?.role === 'object' ? m.user?.role?.name : m.user?.role || 'Staff';
+                        return (
+                          <div key={m.userId} title={`${m.user?.firstName || ''} ${m.user?.lastName || ''} (${roleName}) • ${isMemOnline ? translations[language].statusOnline : translations[language].statusOffline}`} className="relative shrink-0">
+                            <div className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center font-bold text-[9px] text-white uppercase shadow-sm overflow-hidden shrink-0">
+                              {m.user?.avatarUrl ? (
+                                <img
+                                  src={m.user.avatarUrl}
+                                  alt={m.user.firstName}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                m.user?.firstName ? m.user.firstName[0] : 'U'
+                              )}
+                            </div>
+                            <span className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-slate-900 ${
+                              isMemOnline ? 'bg-emerald-400 ring-1 ring-emerald-400/40' : 'bg-slate-500'
+                            }`} />
+                          </div>
+                        );
+                      })}
                       {activeRoom.members.length > 10 && (
                         <div title="View All Members" onClick={() => { /* View all members logic if needed */ }} className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center font-bold text-[9px] text-teal-400 cursor-pointer hover:bg-slate-700 transition-colors shadow-sm">
                           +{activeRoom.members.length - 10}
@@ -4282,12 +4440,31 @@ export default function ClinicalPlatform() {
                   })}
 
                   {/* Real-time typing indicators */}
-                  {typingUsers.map((u) => (
-                    <div key={u.userId} className="flex items-center gap-2 text-[10px] text-slate-400 animate-pulse bg-slate-900/30 p-2 rounded-lg max-w-xs border border-slate-800">
-                      <Sparkles className="h-3.5 w-3.5 text-teal-400" />
-                      <span>{u.firstName} {translations[language].typingSuffix}</span>
-                    </div>
-                  ))}
+                  {typingUsers
+                    .filter((u) => (!u.roomId || u.roomId === activeRoom?.id) && u.userId !== currentUser?.id)
+                    .map((u) => {
+                      const dirUser = directoryUsers.find((d) => d.id === u.userId);
+                      const displayName = dirUser
+                        ? `${dirUser.firstName} ${dirUser.lastName}`
+                        : u.firstName && !u.firstName.includes(':')
+                        ? `${u.firstName}${u.lastName && !u.lastName.includes(':') ? ` ${u.lastName}` : ''}`
+                        : u.username
+                        ? `@${u.username}`
+                        : (language === 'TH' ? 'มีผู้ใช้งาน' : 'Someone');
+
+                      return (
+                        <div key={u.userId} className="flex items-center gap-2 text-[11px] text-teal-400 font-medium animate-pulse bg-slate-900/60 p-2 px-3 rounded-xl max-w-sm border border-teal-500/20 shadow-sm backdrop-blur-sm">
+                          <span className="flex gap-1 items-center">
+                            <span className="h-1.5 w-1.5 rounded-full bg-teal-400 animate-bounce" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-teal-400 animate-bounce [animation-delay:0.2s]" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-teal-400 animate-bounce [animation-delay:0.4s]" />
+                          </span>
+                          <span>
+                            <strong className="text-white font-semibold">{displayName}</strong> {translations[language].typingSuffix}
+                          </span>
+                        </div>
+                      );
+                    })}
 
                 </div>
                 <div ref={messageEndRef} />
