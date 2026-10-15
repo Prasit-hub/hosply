@@ -770,6 +770,9 @@ export default function ClinicalPlatform() {
   const [activeEmojiCategory, setActiveEmojiCategory] = useState<'smileys' | 'medical' | 'gestures' | 'hearts'>('smileys');
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
 
+  // Session / Logout dialog state
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
   // Directory and Chat Creation
   const [directoryUsers, setDirectoryUsers] = useState<any[]>([]);
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
@@ -3764,7 +3767,7 @@ export default function ClinicalPlatform() {
               )}
             </div>
             <button
-              onClick={handleLogout}
+              onClick={() => setShowLogoutConfirm(true)}
               className="text-slate-500 hover:text-red-400 transition-all p-1.5 rounded-lg hover:bg-slate-800 shrink-0"
               title="Logout session"
             >
@@ -3839,6 +3842,16 @@ export default function ClinicalPlatform() {
               </div>
               <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-900" />
             </div>
+
+            {/* Quick Logout Button (Mobile) */}
+            <button
+              type="button"
+              onClick={() => setShowLogoutConfirm(true)}
+              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 hover:text-rose-200 active:scale-95 transition-all flex items-center justify-center shrink-0"
+              title={translations[language].logoutButton}
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
 
@@ -4733,9 +4746,27 @@ export default function ClinicalPlatform() {
         ) : activeTab === 'settings' ? (
           /* --- SETTINGS TAB --- */
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 md:pb-6 space-y-6 max-w-2xl mx-auto">
-            <h2 className="text-2xl font-black text-white tracking-tight border-b border-slate-800 pb-4">
-              System Settings & Security Config
-            </h2>
+            {/* Settings Header with Quick Logout */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  System Settings & Security Config
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {language === 'TH' ? 'ตั้งค่าระบบ โปรไฟล์ความปลอดภัย และการจัดการบัญชี' : 'System preferences, profile security & account management'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 hover:text-rose-200 border border-rose-500/30 text-xs font-bold transition-all shadow-sm active:scale-95 shrink-0"
+                title={translations[language].logoutButton}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{translations[language].logoutButton}</span>
+                <span className="sm:hidden">{language === 'TH' ? 'ออกจากระบบ' : 'Logout'}</span>
+              </button>
+            </div>
 
             {/* Profile Photo & Vercel Blob Card */}
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4 shadow-xl">
@@ -4975,6 +5006,44 @@ export default function ClinicalPlatform() {
                   </button>
                 </div>
               </form>
+            </div>
+
+            {/* Session & Sign Out Card */}
+            <div className="bg-gradient-to-r from-slate-900 to-rose-950/20 border border-rose-500/25 p-5 rounded-xl space-y-4 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+                    <LogOut className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-extrabold text-white">
+                      {language === 'TH' ? 'เซสชันความปลอดภัยและการออกจากระบบ' : 'Security Session & Account'}
+                    </h4>
+                    <p className="text-xs text-slate-400">
+                      {language === 'TH' ? 'สิ้นสุดเซสชันการทำงานบนอุปกรณ์นี้และลงชื่อออก' : 'Terminate active session and log out of this device'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-800/80">
+                <div className="text-xs text-slate-400 flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                  <span>
+                    {language === 'TH'
+                      ? `เข้าสู่ระบบในชื่อ ${currentUser?.firstName} ${currentUser?.lastName} (@${currentUser?.username})`
+                      : `Signed in as ${currentUser?.firstName} ${currentUser?.lastName} (@${currentUser?.username})`}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowLogoutConfirm(true)}
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-bold text-xs shadow-lg shadow-rose-950/40 transition-all cursor-pointer"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>{translations[language].logoutButton}</span>
+                </button>
+              </div>
             </div>
           </div>
         ) : activeRoom ? (
@@ -7049,6 +7118,56 @@ export default function ClinicalPlatform() {
                   Acknowledge
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- LOGOUT CONFIRMATION DIALOG --- */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-sm rounded-2xl border border-rose-500/30 bg-slate-900/95 shadow-2xl shadow-rose-950/30 p-6 relative overflow-hidden flex flex-col items-center text-center">
+            {/* Glowing top line */}
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-amber-500 via-rose-500 to-red-600" />
+
+            <div className="h-12 w-12 rounded-full flex items-center justify-center mb-4 border bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-lg shadow-rose-900/25">
+              <LogOut className="h-5 w-5 text-rose-400" />
+            </div>
+
+            <h3 className="text-sm font-black mb-1.5 tracking-wide uppercase text-white">
+              {language === 'TH' ? 'ยืนยันการออกจากระบบ' : 'Confirm Session Logout'}
+            </h3>
+
+            <p className="text-xs font-semibold text-teal-400 mb-2">
+              {currentUser?.firstName} {currentUser?.lastName} (@{currentUser?.username})
+            </p>
+
+            <p className="text-[11px] text-slate-400 leading-relaxed mb-6 max-w-[280px]">
+              {language === 'TH'
+                ? 'คุณต้องการสิ้นสุดเซสชันการทำงานและออกจากระบบ hosply หรือไม่? คุณจะต้องลงชื่อเข้าใช้อีกครั้งเพื่อรับข้อความ'
+                : 'Are you sure you want to terminate your secure clinical session? You will need to sign in again to receive messages.'}
+            </p>
+
+            <div className="flex flex-col w-full gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLogoutConfirm(false);
+                  handleLogout();
+                }}
+                className="w-full py-2.5 rounded-xl border border-rose-500/40 bg-rose-600 hover:bg-rose-500 active:scale-[0.98] text-white transition-all text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-rose-950/30 cursor-pointer"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>{translations[language].logoutButton}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="w-full py-2.5 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700/80 active:scale-[0.98] text-slate-300 hover:text-white transition-all text-xs font-bold cursor-pointer"
+              >
+                {translations[language].cancelButton}
+              </button>
             </div>
           </div>
         </div>
