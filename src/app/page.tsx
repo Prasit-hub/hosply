@@ -48,7 +48,10 @@ import {
   History,
   Calendar,
   Plus,
-  Maximize2
+  Maximize2,
+  Mic,
+  MicOff,
+  Smile
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
@@ -759,6 +762,13 @@ export default function ClinicalPlatform() {
   const [decryptedImageUrls, setDecryptedImageUrls] = useState<Record<string, string>>({});
   const decryptingImageIdsRef = useRef<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Speech-to-Text & Emoji states
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [activeEmojiCategory, setActiveEmojiCategory] = useState<'smileys' | 'medical' | 'gestures' | 'hearts'>('smileys');
+  const emojiPickerRef = useRef<HTMLDivElement | null>(null);
 
   // Directory and Chat Creation
   const [directoryUsers, setDirectoryUsers] = useState<any[]>([]);
@@ -2410,6 +2420,106 @@ export default function ClinicalPlatform() {
       console.warn('[Decryption] Failed to auto-load image thumbnail:', err);
     }
   }, [currentUser]);
+
+  // Pre-curated medical and everyday emojis
+  const EMOJI_LISTS = {
+    smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '😉', '😌', '😍', '🥰', '😘', '😋', '😜', '😎', '🥳', '🥺', '😭', '😤', '😡', '🤔', '🤫', '😴', '😷'],
+    medical: ['🩺', '💊', '💉', '🩹', '🧬', '🩸', '🏥', '🚑', '👨‍⚕️', '👩‍⚕️', '🧑‍⚕️', '🔬', '🩻', '🦷', '🫀', '🫁', '🧠', '🤒', '🤕', '🤢', '🤧', '🚨', '📋', '🗂️'],
+    gestures: ['👍', '👎', '👌', '✌️', '🤞', '🤝', '👏', '🙌', '🙏', '✋', '👋', '✍️', '💪', '🤙', '👊', '✊', '🤛', '🤜', '👀', '💡', '✅', '❌', '⚠️', '⚡'],
+    hearts: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '⭐', '🌟', '✨', '💯', '🔥', '🎉'],
+  };
+
+  const handleInsertEmoji = (emoji: string) => {
+    setMessageInput((prev) => prev + emoji);
+  };
+
+  useEffect(() => {
+    const handleClickOutsideEmoji = (e: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    if (showEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutsideEmoji);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutsideEmoji);
+    };
+  }, [showEmojiPicker]);
+
+  // Toggle Speech-to-Text Dictation (Web Speech API)
+  const toggleListening = () => {
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+    if (!SpeechRecognition) {
+      showToast(
+        language === 'TH'
+          ? 'เบราว์เซอร์นี้ยังไม่รองรับระบบแปลงเสียงพูด (แนะนำให้เปิดผ่าน Google Chrome, Edge หรือ Safari)'
+          : 'Speech-to-text is not supported by your browser (Google Chrome, Edge or Safari recommended).',
+        'error'
+      );
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = language === 'TH' ? 'th-TH' : 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        showToast(
+          language === 'TH' ? '🎙️ กำลังฟังเสียง... กรุณาพูดข้อความที่ต้องการ' : '🎙️ Listening... Speak your message now.',
+          'info'
+        );
+      };
+
+      recognition.onresult = (event: any) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          setMessageInput((prev) => (prev ? `${prev} ${finalTranscript}` : finalTranscript));
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        setIsListening(false);
+        if (event.error === 'not-allowed') {
+          showToast(
+            language === 'TH'
+              ? 'กรุณากดอนุญาตการเข้าถึงไมโครโฟนบนเบราว์เซอร์'
+              : 'Microphone access denied. Please grant permission in browser.',
+            'error'
+          );
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err: any) {
+      console.warn('Speech recognition start failed:', err);
+      setIsListening(false);
+    }
+  };
 
   const handleDownloadOrOpen = async (attachment: any, classification: string, action: 'DOWNLOAD' | 'OPEN') => {
     if (!activeRoom) return;
@@ -5526,6 +5636,25 @@ export default function ClinicalPlatform() {
                     </div>
                   )}
 
+                  {/* Speech Recording Active Signal */}
+                  {isListening && (
+                    <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs animate-pulse">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-rose-500 animate-ping" />
+                        <span className="font-bold">
+                          {language === 'TH' ? '🎙️ กำลังฟังเสียงพูด... พูดข้อความได้เลย' : '🎙️ Listening... Speak your message now'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={toggleListening}
+                        className="text-[10px] font-black uppercase text-rose-400 hover:text-white bg-rose-950/60 px-2 py-0.5 rounded border border-rose-800 transition-colors"
+                      >
+                        {language === 'TH' ? 'หยุดฟัง' : 'Stop'}
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-1.5 sm:gap-2">
                     <input
                       type="file"
@@ -5533,6 +5662,8 @@ export default function ClinicalPlatform() {
                       onChange={handleFileChange}
                       className="hidden"
                     />
+
+                    {/* Attachment Button */}
                     <button
                       type="button"
                       disabled={isUploadingFile}
@@ -5546,6 +5677,97 @@ export default function ClinicalPlatform() {
                         <Paperclip className="h-4.5 w-4.5" />
                       )}
                     </button>
+
+                    {/* Emoji Picker Button & Popup */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        disabled={isUploadingFile || (activeRoom.isActive === false && currentUser?.role !== 'Admin')}
+                        onClick={() => setShowEmojiPicker((prev) => !prev)}
+                        className={`p-2.5 sm:p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl transition-all shrink-0 ${
+                          showEmojiPicker ? 'text-teal-400 border-teal-500/50 shadow-sm' : 'text-slate-400 hover:text-white'
+                        }`}
+                        title={language === 'TH' ? 'เลือกอิโมจิ (Emojis)' : 'Select Emoji'}
+                      >
+                        <Smile className="h-4.5 w-4.5" />
+                      </button>
+
+                      {showEmojiPicker && (
+                        <div
+                          ref={emojiPickerRef}
+                          className="absolute bottom-14 left-0 z-50 w-72 sm:w-80 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-3 animate-fade-in backdrop-blur-md"
+                        >
+                          {/* Category Tabs */}
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 text-xs">
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setActiveEmojiCategory('smileys')}
+                                className={`px-2 py-1 rounded-lg text-xs font-bold transition-all ${
+                                  activeEmojiCategory === 'smileys' ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'text-slate-400 hover:text-white'
+                                }`}
+                                title="Smileys"
+                              >
+                                😀
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveEmojiCategory('medical')}
+                                className={`px-2 py-1 rounded-lg text-xs font-bold transition-all ${
+                                  activeEmojiCategory === 'medical' ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'text-slate-400 hover:text-white'
+                                }`}
+                                title="Medical"
+                              >
+                                🩺
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveEmojiCategory('gestures')}
+                                className={`px-2 py-1 rounded-lg text-xs font-bold transition-all ${
+                                  activeEmojiCategory === 'gestures' ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'text-slate-400 hover:text-white'
+                                }`}
+                                title="Gestures"
+                              >
+                                👍
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveEmojiCategory('hearts')}
+                                className={`px-2 py-1 rounded-lg text-xs font-bold transition-all ${
+                                  activeEmojiCategory === 'hearts' ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'text-slate-400 hover:text-white'
+                                }`}
+                                title="Hearts"
+                              >
+                                ❤️
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowEmojiPicker(false)}
+                              className="text-slate-500 hover:text-slate-300 p-1"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+
+                          {/* Emoji Grid */}
+                          <div className="grid grid-cols-7 sm:grid-cols-8 gap-1 max-h-48 overflow-y-auto p-1 text-xl select-none">
+                            {EMOJI_LISTS[activeEmojiCategory].map((emoji, eIdx) => (
+                              <button
+                                key={eIdx}
+                                type="button"
+                                onClick={() => handleInsertEmoji(emoji)}
+                                className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-slate-800 active:scale-125 transition-all"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Main Input Textbox */}
                     <input
                       type="text"
                       value={messageInput}
@@ -5554,6 +5776,31 @@ export default function ClinicalPlatform() {
                       placeholder={activeRoom.isActive === false && currentUser?.role !== 'Admin' ? (language === 'TH' ? 'กลุ่มนี้ถูกปิดการใช้งานโดยผู้ดูแลระบบ (ไม่สามารถส่งข้อความได้)' : 'This group is inactive (Messaging disabled)') : translations[language].messagePlaceholder}
                       className="flex-1 min-w-0 bg-slate-900 border border-slate-800 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base focus:outline-none focus:border-teal-500/80 placeholder-slate-400 text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed chat-message-textbox"
                     />
+
+                    {/* Microphone Speech-to-Text Button */}
+                    <button
+                      type="button"
+                      disabled={isUploadingFile || (activeRoom.isActive === false && currentUser?.role !== 'Admin')}
+                      onClick={toggleListening}
+                      className={`p-2.5 sm:p-3 rounded-xl border transition-all shrink-0 ${
+                        isListening
+                          ? 'bg-rose-500 text-white border-rose-400 animate-pulse shadow-lg shadow-rose-500/30 ring-2 ring-rose-500/40'
+                          : 'bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-teal-400'
+                      }`}
+                      title={
+                        isListening
+                          ? language === 'TH' ? 'คลิกเพื่อหยุดฟังเสียง' : 'Click to stop listening'
+                          : language === 'TH' ? 'พูดผ่านไมค์เพื่อพิมพ์ข้อความ (Speech to Text)' : 'Dictate message via microphone'
+                      }
+                    >
+                      {isListening ? (
+                        <MicOff className="h-4.5 w-4.5 animate-bounce" />
+                      ) : (
+                        <Mic className="h-4.5 w-4.5" />
+                      )}
+                    </button>
+
+                    {/* Send Button */}
                     <button
                       type="submit"
                       disabled={!!dlpBlockMessage || isUploadingFile || (!messageInput.trim() && !selectedAttachmentFile) || (activeRoom.isActive === false && currentUser?.role !== 'Admin')}
