@@ -4007,6 +4007,7 @@ export default function ClinicalPlatform() {
                     <tbody className="divide-y divide-slate-800/60">
                       {adminGroups
                         .filter((g) => {
+                          if (g.type === 'DIRECT') return false;
                           const query = adminGroupSearch.toLowerCase();
                           const matchesQuery = (g.name || '').toLowerCase().includes(query) || (g.patientContext?.hn || '').toLowerCase().includes(query);
                           const matchesFilter =

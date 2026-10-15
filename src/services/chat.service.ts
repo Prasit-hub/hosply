@@ -694,6 +694,10 @@ export class ChatService {
       throw new Error('Chat room not found');
     }
 
+    if (room.type === 'DIRECT') {
+      throw new Error('ไม่สามารถจัดการสมาชิกในห้องแชตประเภท 1-on-1 ได้');
+    }
+
     // 2. Check operator permissions: must be System Admin or Room Admin
     const operatorUser = await prisma.user.findUnique({
       where: { id: operatorId },
@@ -761,6 +765,14 @@ export class ChatService {
       throw new Error('Only administrators are authorized to change group chat status');
     }
 
+    const room = await prisma.chatRoom.findUnique({
+      where: { id: roomId },
+      select: { type: true },
+    });
+    if (room?.type === 'DIRECT') {
+      throw new Error('ไม่สามารถปรับสถานะห้องแชตประเภท 1-on-1 ได้');
+    }
+
     const updatedRoom = await prisma.chatRoom.update({
       where: { id: roomId },
       data: { isActive },
@@ -818,6 +830,9 @@ export class ChatService {
     }
 
     const rooms = await prisma.chatRoom.findMany({
+      where: {
+        type: { not: 'DIRECT' },
+      },
       orderBy: { updatedAt: 'desc' },
       include: {
         members: {
