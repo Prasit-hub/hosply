@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyJwtAndGetUser } from '@/lib/auth';
 import { chatService } from '@/services/chat.service';
+import { realtimeService } from '@/services/realtime.service';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await verifyJwtAndGetUser(req);
@@ -21,19 +22,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const result = await chatService.clearRoomHistory(roomId, user.id, purgeAll, user.role);
 
-    const io = (global as any).io;
-    if (io) {
-      if (result.purgedAll) {
-        io.to(`room_${roomId}`).emit('roomPurged', {
-          roomId,
-          clearedAt: result.clearedAt,
-        });
-      } else {
-        io.to(`user_${user.id}`).emit('roomCleared', {
-          roomId,
-          clearedAt: result.clearedAt,
-        });
-      }
+    if (result.purgedAll) {
+      await realtimeService.triggerRoomPurged(roomId);
+    } else {
+      await realtimeService.triggerRoomCleared(roomId, user.id);
     }
 
     return NextResponse.json({

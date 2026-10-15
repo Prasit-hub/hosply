@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyJwtAndGetUser } from '@/lib/auth';
 import { chatService } from '@/services/chat.service';
+import { realtimeService } from '@/services/realtime.service';
 
 export async function GET(req: Request) {
   const user = await verifyJwtAndGetUser(req);
@@ -28,13 +29,12 @@ export async function POST(req: Request) {
     const room = await chatService.createRoom({ name, type, memberIds, patientHn }, user.id);
     
     // Broadcast real-time signal to all added members
-    const io = (global as any).io;
-    if (io) {
-      const allMemberIds = Array.from(new Set([user.id, ...(memberIds || [])]));
-      allMemberIds.forEach((mId) => {
-        io.to(`user_${mId}`).emit('roomJoined', { roomId: room.id, type: 'create', room });
-      });
-    }
+    const allMemberIds = Array.from(new Set([user.id, ...(memberIds || [])]));
+    await Promise.all(
+      allMemberIds.map((mId) =>
+        realtimeService.triggerRoomJoined(mId, { roomId: room.id, type: 'create', room })
+      )
+    );
 
     return NextResponse.json(room);
   } catch (error: any) {

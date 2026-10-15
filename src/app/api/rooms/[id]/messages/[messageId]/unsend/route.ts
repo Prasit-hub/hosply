@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyJwtAndGetUser } from '@/lib/auth';
 import { chatService } from '@/services/chat.service';
+import { realtimeService } from '@/services/realtime.service';
 
 export async function POST(
   req: Request,
@@ -22,14 +23,7 @@ export async function POST(
       ipAddress
     );
 
-    const io = (global as any).io;
-    if (io) {
-      io.to(`room_${roomId}`).emit('messageUnsent', {
-        messageId: result.messageId,
-        roomId: result.roomId,
-        deletedAt: result.deletedAt,
-      });
-    }
+    await realtimeService.triggerUnsend(roomId, result.messageId, result.deletedAt || undefined);
 
     return NextResponse.json({
       message: 'Message unsent successfully',
