@@ -49,6 +49,9 @@ export class ChatService {
             roomName = `${decrypt(otherMember.user.firstName)} ${decrypt(otherMember.user.lastName)} (${otherMember.user.role.name})`;
           }
         }
+        if (!roomName || !roomName.trim()) {
+          roomName = m.room.type === 'GROUP' ? 'กลุ่มสนทนา (Group Chat)' : 'ห้องสนทนา';
+        }
 
         const decryptedMembers = m.room.members.map(rm => ({
           ...rm,
@@ -79,22 +82,35 @@ export class ChatService {
       include: { user: { include: { role: { include: { permissions: true } } } } },
     });
 
+    let userRole = membership?.user?.role;
+
     if (!membership) {
-      throw new Error('You are not a member of this chat room');
+      // Check if user is System Admin
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { role: { include: { permissions: true } } },
+      });
+      if (user && user.role.name === 'Admin') {
+        userRole = user.role;
+      } else {
+        throw new Error('You are not a member of this chat room');
+      }
     }
 
-    // Update lastReadAt for the reader in this room
-    try {
-      await prisma.roomMember.update({
-        where: { roomId_userId: { roomId, userId } },
-        data: { lastReadAt: new Date() },
-      });
-    } catch (err) {
-      console.error('[ChatService] Failed to update lastReadAt in getRoomMessages:', err);
+    // Update lastReadAt for the reader in this room if member
+    if (membership) {
+      try {
+        await prisma.roomMember.update({
+          where: { roomId_userId: { roomId, userId } },
+          data: { lastReadAt: new Date() },
+        });
+      } catch (err) {
+        console.error('[ChatService] Failed to update lastReadAt in getRoomMessages:', err);
+      }
     }
 
     const where: any = { roomId };
-    if (membership.clearedAt) {
+    if (membership?.clearedAt) {
       where.createdAt = { gt: membership.clearedAt };
     }
     if (cursor) {
@@ -121,7 +137,7 @@ export class ChatService {
     });
 
     // Decrypt messages & Check classifications
-    const userPermissions = membership.user.role.permissions.map(p => p.action);
+    const userPermissions = userRole ? userRole.permissions.map(p => p.action) : [];
     const hasConfidentialAccess = userPermissions.includes('READ_CONFIDENTIAL');
     const hasRestrictedAccess = userPermissions.includes('READ_RESTRICTED');
 

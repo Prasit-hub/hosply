@@ -188,7 +188,7 @@ export class AuthService {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         role: staffRole.name,
-        avatarUrl: newUser.avatarUrl || null,
+        avatarUrl: (newUser as any).avatarUrl || null,
       },
     };
   }
@@ -287,7 +287,7 @@ export class AuthService {
         firstName: decrypt(user.firstName),
         lastName: decrypt(user.lastName),
         role: user.role.name,
-        avatarUrl: user.avatarUrl || null,
+        avatarUrl: (user as any).avatarUrl || null,
       },
     };
   }
