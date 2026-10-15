@@ -45,7 +45,6 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
-import PusherClient from 'pusher-js';
 
 // --- Client-side End-to-End Cryptography Helpers (Model B) ---
 async function getCryptoKey(roomId: string): Promise<CryptoKey> {
@@ -915,7 +914,6 @@ export default function ClinicalPlatform() {
 
   // Refs
   const socketRef = useRef<Socket | null>(null);
-  const pusherRef = useRef<PusherClient | null>(null);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
   const shouldScrollToBottomRef = useRef<boolean>(true);
 
@@ -1030,197 +1028,13 @@ export default function ClinicalPlatform() {
       fetchAdminRoles();
     }
 
-    // Shared Realtime Event Handlers (compatible with both Socket.io and Pusher Channels)
-    const onNewMessage = (msg: Message) => {
-      const isMe = msg.sender.id === currentUser.id;
-
-      if (!isMe) {
-        // Play gentle chime
-        playNotificationSound();
-
-        // If message is in another room, display custom toast signal
-        const currentActiveRoom = activeRoomRef.current;
-        if (!currentActiveRoom || msg.roomId !== currentActiveRoom.id) {
-          // Fetch updated rooms list to update unread counts
-          fetchRooms();
-          
-          // Show toast alert
-          const targetRoom = roomsRef.current.find((r) => r.id === msg.roomId);
-          const roomLabel = targetRoom ? targetRoom.name : 'another discussion';
-          showToast(`New message in ${roomLabel} from ${msg.sender.firstName}: "${msg.content.substring(0, 30)}${msg.content.length > 30 ? '...' : ''}"`, 'info');
-        } else {
-          // Active room: mark as read immediately
-          if (socketRef.current?.connected) {
-            socketRef.current.emit('readRoom', { roomId: currentActiveRoom.id });
-          }
-        }
-      }
-
-      // Update room list in state locally to prevent HTTP fetch race condition
-      setRooms((prevRooms) => {
-        const currentActive = activeRoomRef.current || activeRoom;
-        return prevRooms.map((r) => {
-          if (r.id === msg.roomId) {
-            const isActive = currentActive && currentActive.id === msg.roomId;
-            return {
-              ...r,
-              unreadCount: isActive ? 0 : (r.unreadCount || 0) + (isMe ? 0 : 1),
-            };
-          }
-          return r;
-        });
-      });
-
-      // Append if it's the active room
-      setMessages((prev) => {
-        const currentActiveRoom = activeRoomRef.current;
-        if (!currentActiveRoom || msg.roomId !== currentActiveRoom.id) return prev;
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        return [...prev, msg];
-      });
-
-      // Update room last reading status in database
-      setTimeout(() => {
-        fetchRooms();
-      }, 300);
-    };
-
-    const onRoomJoined = (data: any) => {
-      console.log('[Realtime] You joined or were invited to a new room:', data);
-      fetchRooms();
-      showToast('You have been added to a new chat group!', 'success');
-      playNotificationSound();
-      
-      // Auto-join the new room's socket channel if socket is connected
-      if (data.roomId && socketRef.current?.connected) {
-        socketRef.current.emit('joinRoom', { roomId: data.roomId });
-      }
-    };
-
-    const onRoomMembersUpdated = (data: any) => {
-      console.log('[Realtime] Room roster updated:', data);
-      fetchRooms();
-    };
-
-    const onUserReadRoom = (data: { userId: string; roomId: string; lastReadAt: string }) => {
-      setActiveRoom((prev) => {
-        if (!prev || prev.id !== data.roomId) return prev;
-        const updatedMembers = (prev.members || []).map((m: any) => {
-          if (m.userId === data.userId || m.user?.id === data.userId) {
-            return { ...m, lastReadAt: data.lastReadAt };
-          }
-          return m;
-        });
-        return { ...prev, members: updatedMembers };
-      });
-
-      setRooms((prevRooms) =>
-        prevRooms.map((r) => {
-          if (r.id !== data.roomId) return r;
-          const updatedMembers = (r.members || []).map((m: any) => {
-            if (m.userId === data.userId || m.user?.id === data.userId) {
-              return { ...m, lastReadAt: data.lastReadAt };
-            }
-            return m;
-          });
-          return { ...r, members: updatedMembers };
-        })
-      );
-    };
-
-    const onUserTyping = (data: any) => {
-      if (data.isTyping) {
-        setTypingUsers((prev) => {
-          const filtered = prev.filter((u) => u.userId !== data.userId);
-          return [...filtered, { ...data, timestamp: Date.now() }];
-        });
-      } else {
-        setTypingUsers((prev) => prev.filter((u) => u.userId !== data.userId));
-      }
-    };
-
-    const onMessageUnsent = (data: { messageId: string; roomId: string; deletedAt?: string }) => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === data.messageId
-            ? {
-                ...m,
-                deletedAt: data.deletedAt || new Date().toISOString(),
-                content: '[This message was unsent]',
-                attachments: [],
-              }
-            : m
-        )
-      );
-      fetchRooms();
-    };
-
-    const onRoomCleared = (data: { roomId: string }) => {
-      if (activeRoomRef.current?.id === data.roomId) {
-        setMessages([]);
-      }
-      fetchRooms();
-    };
-
-    const onRoomPurged = (data: { roomId: string }) => {
-      if (activeRoomRef.current?.id === data.roomId) {
-        setMessages([]);
-      }
-      fetchRooms();
-      showToast('Room chat history was purged by administrator', 'info');
-    };
-
-    // 1. Pusher Channels initialization (for Vercel Serverless)
-    const pusherKey = process.env.NEXT_PUBLIC_PUSHER_KEY;
-    let pusherClient: PusherClient | null = null;
-
-    if (pusherKey) {
-      try {
-        pusherClient = new PusherClient(pusherKey, {
-          cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'ap1',
-          authEndpoint: `${API_URL}/api/pusher/auth`,
-          auth: {
-            headers: {
-              Authorization: `Bearer ${currentUser.accessToken}`,
-            },
-          },
-        });
-        pusherRef.current = pusherClient;
-
-        // Global presence channel for real-time online/offline presence
-        const globalPresence = pusherClient.subscribe('presence-global-users');
-        globalPresence.bind('pusher:subscription_succeeded', (members: any) => {
-          const ids = Object.keys(members.members || {});
-          setOnlineUserIds(new Set(ids));
-        });
-        globalPresence.bind('pusher:member_added', (member: any) => {
-          setOnlineUserIds((prev) => new Set(prev).add(member.id));
-        });
-        globalPresence.bind('pusher:member_removed', (member: any) => {
-          setOnlineUserIds((prev) => {
-            const next = new Set(prev);
-            next.delete(member.id);
-            return next;
-          });
-        });
-
-        // User personal notification channel
-        const userChannel = pusherClient.subscribe(`private-user-${currentUser.id}`);
-        userChannel.bind('newMessage', onNewMessage);
-        userChannel.bind('roomJoined', onRoomJoined);
-        userChannel.bind('roomCleared', onRoomCleared);
-        userChannel.bind('roomPurged', onRoomPurged);
-      } catch (pusherErr) {
-        console.warn('[Pusher] Client initialization error:', pusherErr);
-      }
-    }
-
-    // 2. Socket.io initialization (for Localhost / Node Server)
+    // Socket.io initialization
     const socket = io(API_URL, {
       query: { token: currentUser.accessToken },
-      transports: ['websocket', 'polling'],
-      autoConnect: true,
+      // Removed strict transports: ['websocket'] to allow fallback to HTTP Long-Polling
+      // if NGINX/Ubuntu proxy isn't configured with Upgrade headers properly.
     });
+
     socketRef.current = socket;
 
     socket.on('connect', () => {
@@ -1248,16 +1062,110 @@ export default function ClinicalPlatform() {
       });
     });
 
-    socket.on('newMessage', onNewMessage);
-    socket.on('roomJoined', onRoomJoined);
-    socket.on('roomMembersUpdated', onRoomMembersUpdated);
-    socket.on('userReadRoom', onUserReadRoom);
-    socket.on('userTyping', onUserTyping);
-    socket.on('messageUnsent', onMessageUnsent);
-    socket.on('roomCleared', onRoomCleared);
-    socket.on('roomPurged', onRoomPurged);
-    socket.on('error', (err: any) => {
-      showToast(`Server Action: ${err.message}`, 'error');
+    socket.on('newMessage', (msg: Message) => {
+      const isMe = msg.sender.id === currentUser.id;
+
+      if (!isMe) {
+        // Play gentle chime
+        playNotificationSound();
+
+        // If message is in another room, display custom toast signal
+        const currentActiveRoom = activeRoomRef.current;
+        if (!currentActiveRoom || msg.roomId !== currentActiveRoom.id) {
+          // Fetch updated rooms list to update unread counts
+          fetchRooms();
+          
+          // Show toast alert
+          const targetRoom = roomsRef.current.find((r) => r.id === msg.roomId);
+          const roomLabel = targetRoom ? targetRoom.name : 'another discussion';
+          showToast(`New message in ${roomLabel} from ${msg.sender.firstName}: "${msg.content.substring(0, 30)}${msg.content.length > 30 ? '...' : ''}"`, 'info');
+        } else {
+          // Active room: mark as read immediately by emitting readRoom to clear unread database count
+          socket.emit('readRoom', { roomId: currentActiveRoom.id });
+        }
+      }
+
+      // Update room list in state locally to prevent HTTP fetch race condition
+      setRooms((prevRooms) => {
+        const currentActive = activeRoomRef.current || activeRoom;
+        return prevRooms.map((r) => {
+          if (r.id === msg.roomId) {
+            const isActive = currentActive && currentActive.id === msg.roomId;
+            return {
+              ...r,
+              unreadCount: isActive ? 0 : (r.unreadCount || 0) + (isMe ? 0 : 1),
+            };
+          }
+          return r;
+        });
+      });
+
+      // Append if it's the active room
+      setMessages((prev) => {
+        const currentActiveRoom = activeRoomRef.current;
+        if (!currentActiveRoom || msg.roomId !== currentActiveRoom.id) return prev;
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+
+      // Update room last reading status in database, slightly delayed to avoid DB write/read race conditions
+      setTimeout(() => {
+        fetchRooms();
+      }, 300);
+    });
+
+    socket.on('roomJoined', (data: any) => {
+      console.log('[Socket] You joined or were invited to a new room:', data);
+      fetchRooms();
+      showToast('You have been added to a new chat group!', 'success');
+      playNotificationSound();
+      
+      // Auto-join the new room's socket channel so we can receive its messages
+      if (data.roomId && socketRef.current) {
+        socketRef.current.emit('joinRoom', { roomId: data.roomId });
+      }
+    });
+
+    socket.on('roomMembersUpdated', (data: any) => {
+      console.log('[Socket] Room roster updated:', data);
+      fetchRooms();
+    });
+
+    socket.on('userReadRoom', (data: { userId: string; roomId: string; lastReadAt: string }) => {
+      setActiveRoom((prev) => {
+        if (!prev || prev.id !== data.roomId) return prev;
+        const updatedMembers = (prev.members || []).map((m: any) => {
+          if (m.userId === data.userId || m.user?.id === data.userId) {
+            return { ...m, lastReadAt: data.lastReadAt };
+          }
+          return m;
+        });
+        return { ...prev, members: updatedMembers };
+      });
+
+      setRooms((prevRooms) =>
+        prevRooms.map((r) => {
+          if (r.id !== data.roomId) return r;
+          const updatedMembers = (r.members || []).map((m: any) => {
+            if (m.userId === data.userId || m.user?.id === data.userId) {
+              return { ...m, lastReadAt: data.lastReadAt };
+            }
+            return m;
+          });
+          return { ...r, members: updatedMembers };
+        })
+      );
+    });
+
+    socket.on('userTyping', (data: any) => {
+      if (data.isTyping) {
+        setTypingUsers((prev) => {
+          const filtered = prev.filter((u) => u.userId !== data.userId);
+          return [...filtered, { ...data, timestamp: Date.now() }];
+        });
+      } else {
+        setTypingUsers((prev) => prev.filter((u) => u.userId !== data.userId));
+      }
     });
 
     const typingCleaner = setInterval(() => {
@@ -1268,11 +1176,43 @@ export default function ClinicalPlatform() {
       });
     }, 2000);
 
+    socket.on('messageUnsent', (data: { messageId: string; roomId: string; deletedAt?: string }) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === data.messageId
+            ? {
+                ...m,
+                deletedAt: data.deletedAt || new Date().toISOString(),
+                content: '[This message was unsent]',
+                attachments: [],
+              }
+            : m
+        )
+      );
+      fetchRooms();
+    });
+
+    socket.on('roomCleared', (data: { roomId: string }) => {
+      if (activeRoomRef.current?.id === data.roomId) {
+        setMessages([]);
+      }
+      fetchRooms();
+    });
+
+    socket.on('roomPurged', (data: { roomId: string }) => {
+      if (activeRoomRef.current?.id === data.roomId) {
+        setMessages([]);
+      }
+      fetchRooms();
+      showToast('Room chat history was purged by administrator', 'info');
+    });
+
+    socket.on('error', (err: any) => {
+      showToast(`Server Blocked Action: ${err.message}`, 'error');
+    });
+
     return () => {
       clearInterval(typingCleaner);
-      if (pusherClient) {
-        pusherClient.disconnect();
-      }
       socket.disconnect();
     };
   }, [currentUser]);
@@ -1294,81 +1234,14 @@ export default function ClinicalPlatform() {
     );
 
     // Subscribe to Socket Room and mark as read on server to update database record
-    if (socketRef.current?.connected) {
+    if (socketRef.current) {
       socketRef.current.emit('joinRoom', { roomId: activeRoomId });
       socketRef.current.emit('readRoom', { roomId: activeRoomId });
     }
 
-    // Subscribe to Pusher room channel if Pusher is active
-    if (pusherRef.current) {
-      const roomChannelName = `presence-room-${activeRoomId}`;
-      const channel = pusherRef.current.subscribe(roomChannelName);
-      channel.bind('newMessage', (msg: Message) => {
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === msg.id)) return prev;
-          return [...prev, msg];
-        });
-      });
-      channel.bind('messageUnsent', (data: any) => {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === data.messageId
-              ? {
-                  ...m,
-                  deletedAt: data.deletedAt || new Date().toISOString(),
-                  content: '[This message was unsent]',
-                  attachments: [],
-                }
-              : m
-          )
-        );
-      });
-      channel.bind('userTyping', (data: any) => {
-        if (data.isTyping) {
-          setTypingUsers((prev) => {
-            const filtered = prev.filter((u) => u.userId !== data.userId);
-            return [...filtered, { ...data, timestamp: Date.now() }];
-          });
-        } else {
-          setTypingUsers((prev) => prev.filter((u) => u.userId !== data.userId));
-        }
-      });
-      channel.bind('roomCleared', (data: any) => {
-        if (data.roomId === activeRoomId) setMessages([]);
-      });
-      channel.bind('roomPurged', (data: any) => {
-        if (data.roomId === activeRoomId) {
-          setMessages([]);
-          showToast('Room chat history was purged by administrator', 'info');
-        }
-      });
-    }
-
     // Fetch message history REST
     fetchMessages(activeRoomId);
-
-    return () => {
-      if (pusherRef.current) {
-        pusherRef.current.unsubscribe(`presence-room-${activeRoomId}`);
-      }
-    };
   }, [activeRoomId]);
-
-  // Automatic Polling Fallback (ensures messages update on Vercel even if WebSocket/Pusher is disconnected)
-  useEffect(() => {
-    if (!currentUser || !activeRoomId) return;
-
-    const interval = setInterval(() => {
-      // If Socket.io is connected, socket handles realtime push
-      if (socketRef.current?.connected) return;
-
-      // Otherwise, poll for latest messages in active room
-      fetchMessages(activeRoomId, false);
-      fetchRooms();
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [currentUser, activeRoomId]);
 
   // --- API CALLS ---
   const handleLogin = async (e: React.FormEvent) => {
@@ -1465,9 +1338,6 @@ export default function ClinicalPlatform() {
     if (socketRef.current) {
       socketRef.current.emit('userLogout');
       socketRef.current.disconnect();
-    }
-    if (pusherRef.current) {
-      pusherRef.current.disconnect();
     }
     if (token) {
       try {
@@ -2371,7 +2241,7 @@ export default function ClinicalPlatform() {
     }
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!messageInput.trim() && !selectedAttachmentFile) return;
 
@@ -2384,80 +2254,69 @@ export default function ClinicalPlatform() {
       return;
     }
 
-    if (activeRoom) {
-      if (socketRef.current?.connected) {
-        socketRef.current.emit('typing', { roomId: activeRoom.id, isTyping: false });
-      } else {
-        fetch(`${API_URL}/api/rooms/${activeRoom.id}/typing`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${currentUser?.accessToken}`,
-          },
-          body: JSON.stringify({ isTyping: false }),
-        }).catch(() => {});
-      }
+    if (socketRef.current && activeRoom) {
+      socketRef.current.emit('typing', { roomId: activeRoom.id, isTyping: false });
     }
 
-    const content = messageInput || (selectedAttachmentFile ? `Shared an attachment: ${selectedAttachmentFile.name}` : '');
-    const classification = selectedClassification;
-    const messageId = selectedAttachmentFile?.messageId;
+    const filePayload = selectedAttachmentFile ? [selectedAttachmentFile] : undefined;
+
+    if (socketRef.current?.connected && activeRoom) {
+      socketRef.current.emit('sendMessage', {
+        roomId: activeRoom.id,
+        content: messageInput || (selectedAttachmentFile ? `Shared an attachment: ${selectedAttachmentFile.name}` : ''),
+        classification: selectedClassification,
+        messageId: selectedAttachmentFile?.messageId,
+      });
+    } else if (activeRoom) {
+      const newMsg: Message = {
+        id: selectedAttachmentFile?.messageId || Math.random().toString(),
+        roomId: activeRoom.id,
+        content: messageInput || (selectedAttachmentFile ? `Shared an attachment: ${selectedAttachmentFile.name}` : ''),
+        classification: selectedClassification,
+        createdAt: new Date().toISOString(),
+        sender: {
+          id: currentUser?.id || 'demo-user',
+          username: currentUser?.username || 'doctor1',
+          firstName: currentUser?.firstName || 'สมชาย',
+          lastName: currentUser?.lastName || 'รักดี',
+          role: currentUser?.role || 'Doctor',
+          avatarUrl: currentUser?.avatarUrl || null,
+        },
+        attachments: filePayload,
+      };
+
+      setMessages((prev) => [...prev, newMsg]);
+
+      if (dlpWarning) {
+        setAuditLogs((prev) => [
+          {
+            id: Math.random().toString(),
+            action: 'DLP_TRIGGERED_WARN',
+            entity: 'Message',
+            details: JSON.stringify({ reason: dlpWarning.reason, text: dlpWarning.match }),
+            ipAddress: '127.0.0.1',
+            createdAt: new Date().toISOString(),
+            user: { username: currentUser!.username, firstName: currentUser!.firstName, lastName: currentUser!.lastName, role: { name: currentUser!.role } },
+          },
+          ...prev,
+        ]);
+        setDlpAlertsCount((c) => c + 1);
+      }
+    }
 
     setMessageInput('');
     setDlpWarning(null);
     setSelectedAttachmentFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-
-    if (!activeRoom) return;
-
-    try {
-      const res = await fetch(`${API_URL}/api/rooms/${activeRoom.id}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${currentUser?.accessToken}`,
-        },
-        body: JSON.stringify({ content, classification, messageId }),
-      });
-
-      if (res.ok) {
-        const savedMsg = await res.json();
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === savedMsg.id)) return prev;
-          return [...prev, savedMsg];
-        });
-        fetchRooms();
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        showToast(`Send Error: ${errData.message || 'Failed to send'}`, 'error');
-      }
-    } catch (err: any) {
-      console.error('Failed to send message:', err);
-      showToast('Network error sending message', 'error');
-    }
   };
 
   const handleTypingEvent = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setMessageInput(val);
+    setMessageInput(e.target.value);
 
-    if (activeRoom) {
-      const isTyping = val.length > 0;
-      if (socketRef.current?.connected) {
-        socketRef.current.emit('typing', {
-          roomId: activeRoom.id,
-          isTyping,
-        });
-      } else {
-        fetch(`${API_URL}/api/rooms/${activeRoom.id}/typing`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${currentUser?.accessToken}`,
-          },
-          body: JSON.stringify({ isTyping }),
-        }).catch(() => {});
-      }
+    if (socketRef.current && activeRoom) {
+      socketRef.current.emit('typing', {
+        roomId: activeRoom.id,
+        isTyping: e.target.value.length > 0,
+      });
     }
   };
 
