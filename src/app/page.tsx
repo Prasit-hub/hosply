@@ -521,12 +521,12 @@ export default function ClinicalPlatform() {
   // Authentication & Global State
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
-  const [currentTheme, setCurrentTheme] = useState<'teal' | 'navy' | 'emerald' | 'light'>('teal');
+  const [currentTheme, setCurrentTheme] = useState<'teal' | 'navy' | 'emerald' | 'light' | 'line_pc'>('teal');
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('hosply_theme');
-    if (savedTheme === 'teal' || savedTheme === 'navy' || savedTheme === 'emerald' || savedTheme === 'light') {
-      setCurrentTheme(savedTheme);
+    if (savedTheme === 'teal' || savedTheme === 'navy' || savedTheme === 'emerald' || savedTheme === 'light' || savedTheme === 'line_pc') {
+      setCurrentTheme(savedTheme as any);
     }
   }, []);
 
@@ -2964,8 +2964,8 @@ export default function ClinicalPlatform() {
       />
       <style>{`
         :root {
-          --accent-color: ${currentTheme === 'teal' ? '#06C755' : currentTheme === 'navy' ? '#3b82f6' : currentTheme === 'emerald' ? '#10b981' : '#0284c7'};
-          --accent-hover: ${currentTheme === 'teal' ? '#05b34c' : currentTheme === 'navy' ? '#2563eb' : currentTheme === 'emerald' ? '#059669' : '#0369a1'};
+          --accent-color: ${currentTheme === 'teal' || currentTheme === 'line_pc' ? '#06C755' : currentTheme === 'navy' ? '#3b82f6' : currentTheme === 'emerald' ? '#10b981' : '#0284c7'};
+          --accent-hover: ${currentTheme === 'teal' || currentTheme === 'line_pc' ? '#05b34c' : currentTheme === 'navy' ? '#2563eb' : currentTheme === 'emerald' ? '#059669' : '#0369a1'};
         }
         .bg-teal-500 {
           background-color: var(--accent-color) !important;
@@ -3003,17 +3003,164 @@ export default function ClinicalPlatform() {
 
         /* Custom speech bubbles matching Line Chat theme */
         .self-bubble {
-          background-color: ${currentTheme === 'teal' ? 'rgba(6, 199, 85, 0.25)' : 'rgba(20, 184, 166, 0.15)'} !important;
-          border-color: var(--accent-color) !important;
+          background-color: ${currentTheme === 'line_pc' ? '#06C755' : currentTheme === 'teal' ? 'rgba(6, 199, 85, 0.25)' : 'rgba(20, 184, 166, 0.15)'} !important;
+          border-color: ${currentTheme === 'line_pc' ? '#05b34c' : 'var(--accent-color)'} !important;
           color: #ffffff !important;
+          box-shadow: ${currentTheme === 'line_pc' ? '0 1px 2px rgba(0, 0, 0, 0.15)' : 'none'} !important;
         }
         .other-bubble {
-          background-color: #242b35 !important;
-          border-color: #2b3543 !important;
-          color: #f8fafc !important;
+          background-color: ${currentTheme === 'line_pc' ? '#ffffff' : '#242b35'} !important;
+          border-color: ${currentTheme === 'line_pc' ? '#e2e8f0' : '#2b3543'} !important;
+          color: ${currentTheme === 'line_pc' ? '#0f172a' : '#f8fafc'} !important;
+          box-shadow: ${currentTheme === 'line_pc' ? '0 1px 2px rgba(0, 0, 0, 0.08)' : 'none'} !important;
         }
         
-        ${currentTheme === 'light' ? `
+        ${currentTheme === 'line_pc' ? `
+          /* --- LINE on PC Desktop Theme --- */
+          /* 1. Chat Canvas: Iconic LINE Desktop Dusty Powder Blue */
+          .bg-slate-950 {
+            background-color: #7a99b8 !important;
+          }
+
+          /* 2. Chat list subbar, Header, Typing bar, Modals */
+          .bg-slate-900\\/60, .bg-slate-900\\/50, .bg-slate-900\\/40, .bg-slate-900\\/30, .bg-slate-900\\/90, .bg-slate-900\\/95 {
+            background-color: #ffffff !important;
+          }
+          .bg-slate-900 {
+            background-color: #ffffff !important;
+          }
+
+          /* Active Room Highlight in Room List */
+          .bg-slate-800\\/90 {
+            background-color: #e8f2fc !important;
+            border-color: #b9d8fa !important;
+          }
+          .bg-slate-800\\/90 p, .bg-slate-800\\/90 span, .bg-slate-800\\/90 div {
+            color: #0f172a !important;
+          }
+          .bg-slate-800\\/50, .bg-slate-800\\/40, .bg-slate-800\\/30, .bg-slate-800\\/20 {
+            background-color: #f1f5f9 !important;
+          }
+          .hover\\:bg-slate-800\\/30:hover {
+            background-color: #f8fafc !important;
+          }
+
+          /* 3. Left Navigation Rail: Iconic LINE PC Dark Charcoal Sidebar */
+          div.hidden.md\\:flex.bg-slate-900 {
+            background-color: #23272e !important;
+            border-color: #1a1e24 !important;
+          }
+          div.hidden.md\\:flex.bg-slate-900 h1.text-white,
+          div.hidden.md\\:flex.bg-slate-900 p.text-white,
+          div.hidden.md\\:flex.bg-slate-900 span.text-white {
+            color: #ffffff !important;
+          }
+          div.hidden.md\\:flex.bg-slate-900 .text-slate-400 {
+            color: #94a3b8 !important;
+          }
+          div.hidden.md\\:flex.bg-slate-900 .border-slate-800 {
+            border-color: #1a1e24 !important;
+          }
+          div.hidden.md\\:flex.bg-slate-900 .bg-slate-800\\/60,
+          div.hidden.md\\:flex.bg-slate-900 .bg-slate-800 {
+            background-color: #2d333f !important;
+            border-color: #3b4252 !important;
+          }
+
+          /* 4. Borders & Dividers */
+          .border-slate-800, .border-slate-800\\/80, .border-slate-800\\/60,
+          .border-slate-700, .border-slate-700\\/60, .border-slate-700\\/80, .border-slate-850 {
+            border-color: #e5e7eb !important;
+          }
+
+          /* 5. Typography */
+          .text-slate-100, .text-slate-200, .text-slate-300 {
+            color: #0f172a !important;
+          }
+          .text-slate-400, .text-slate-500 {
+            color: #64748b !important;
+          }
+          h1.text-white, h2.text-white, h3.text-white, h4.text-white,
+          p.text-white, span.text-white:not([class*="bg-"]):not([class*="badge"]), div.text-white:not([class*="bg-"]) {
+            color: #0f172a !important;
+          }
+
+          /* 6. Speech Bubbles for LINE on PC */
+          .self-bubble {
+            background-color: #06C755 !important;
+            border: 1px solid #05b34c !important;
+            color: #ffffff !important;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12) !important;
+          }
+          .self-bubble p, .self-bubble span, .self-bubble div {
+            color: #ffffff !important;
+          }
+          .other-bubble {
+            background-color: #ffffff !important;
+            border: 1px solid #e5e7eb !important;
+            color: #0f172a !important;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08) !important;
+          }
+          .other-bubble p, .other-bubble span, .other-bubble div {
+            color: #0f172a !important;
+          }
+          .self-bubble-tail::after {
+            background-color: #06C755 !important;
+            border-right: 1px solid #05b34c;
+            border-top: 1px solid #05b34c;
+          }
+          .other-bubble-tail::before {
+            background-color: #ffffff !important;
+            border-left: 1px solid #e5e7eb;
+            border-top: 1px solid #e5e7eb;
+          }
+
+          /* 7. Canvas Elements (Timestamps, Read badges, Sender names) */
+          .line-chat-bg .text-slate-500, .line-chat-bg .dark\\:text-slate-400 {
+            color: #ffffff !important;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+          }
+          .line-chat-bg .line-read-badge {
+            color: #ffffff !important;
+            font-weight: 800 !important;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+          }
+          .line-chat-bg span.font-extrabold.text-slate-700, .line-chat-bg span.font-extrabold.dark\\:text-slate-200 {
+            color: #ffffff !important;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+          }
+
+          /* 8. Action Buttons text remains crisp white */
+          button.bg-teal-500, button.bg-teal-500 *,
+          .bg-teal-500, .bg-teal-500 *,
+          .bg-red-500, .bg-red-500 *,
+          .bg-rose-500, .bg-rose-500 *,
+          .bg-emerald-500, .bg-emerald-500 *,
+          .bg-sky-500, .bg-sky-500 * {
+            color: #ffffff !important;
+          }
+
+          /* 9. Inputs & Textareas */
+          input, select, textarea {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            border-color: #d1d5db !important;
+          }
+          input::placeholder, textarea::placeholder {
+            color: #9ca3af !important;
+          }
+
+          /* 10. Modals & Context Menus */
+          .fixed.z-50.bg-slate-900, .bg-slate-900.clinical-glow {
+            background-color: #ffffff !important;
+            border-color: #e5e7eb !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1) !important;
+          }
+          .fixed.z-50.bg-slate-900 button:hover {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+          }
+        ` : currentTheme === 'light' ? `
           /* --- LINE Sky Blue (Light Theme) Refined System Design --- */
 
           /* 1. Canvas & Panels: Clean light neutral backdrop */
@@ -3184,8 +3331,8 @@ export default function ClinicalPlatform() {
         
         /* LINE Chat aesthetics: authentic calming sky blue for chat room canvas */
         .line-chat-bg {
-          background-color: ${currentTheme === 'light' ? '#85a5cc' : '#0f141c'} !important;
-          background-image: ${currentTheme === 'light' ? 'none' : 'radial-gradient(circle at 50% 10%, #17212f, #0b0f15)'} !important;
+          background-color: ${currentTheme === 'light' ? '#85a5cc' : currentTheme === 'line_pc' ? '#7a99b8' : '#0f141c'} !important;
+          background-image: ${currentTheme === 'light' || currentTheme === 'line_pc' ? 'none' : 'radial-gradient(circle at 50% 10%, #17212f, #0b0f15)'} !important;
         }
         .self-bubble-tail {
           position: relative;
@@ -3218,7 +3365,7 @@ export default function ClinicalPlatform() {
         .line-read-badge {
           font-size: 9px;
           font-weight: 700;
-          color: ${currentTheme === 'light' ? '#1e3a8a' : '#06C755'} !important;
+          color: ${currentTheme === 'light' ? '#1e3a8a' : currentTheme === 'line_pc' ? '#ffffff' : '#06C755'} !important;
           margin-bottom: 1px;
           letter-spacing: -0.01em;
         }
@@ -3629,6 +3776,14 @@ export default function ClinicalPlatform() {
                     return mId && onlineUserIds.has(mId);
                   }).length;
 
+                  const otherMember = (room.members || []).find((m: any) => {
+                    const mId = m.userId || m.user?.id;
+                    return mId && mId !== currentUser?.id;
+                  });
+                  const otherMemberId = otherMember ? (otherMember.userId || otherMember.user?.id) : null;
+                  const isPartnerOnline = otherMemberId ? onlineUserIds.has(otherMemberId) : false;
+                  const otherUser = otherMember?.user;
+
                   return (
                     <button
                       key={room.id}
@@ -3656,34 +3811,44 @@ export default function ClinicalPlatform() {
                             : 'border-transparent text-slate-400 hover:bg-slate-800/30 hover:text-slate-200'
                         }`}
                     >
-                      {/* Left Icon Block */}
-                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border relative transition-all duration-300 ${activeRoom?.id === room.id
+                      {/* Left Icon / Avatar Block */}
+                      <div className={`h-9 w-9 ${isDirect ? 'rounded-full' : 'rounded-xl'} flex items-center justify-center shrink-0 border relative transition-all duration-300 overflow-hidden shadow-sm ${activeRoom?.id === room.id
                           ? isDirect
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                            : 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : 'bg-sky-500/20 text-sky-300 border-sky-500/40'
                           : isDirect
                             ? 'bg-slate-800/90 text-emerald-400 border-slate-700/60'
                             : 'bg-slate-800/90 text-sky-400 border-slate-700/60'
                         }`}>
-                        {isDirect ? <User className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+                        {isDirect ? (
+                          otherUser?.avatarUrl ? (
+                            <img
+                              src={otherUser.avatarUrl}
+                              alt={otherUser.firstName || ''}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span className="font-extrabold text-xs uppercase">
+                              {otherUser?.firstName ? otherUser.firstName[0] : (room.name ? room.name[0] : <User className="h-4 w-4" />)}
+                            </span>
+                          )
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center font-black text-xs">
+                            {room.name ? room.name[0] : <Users className="h-4 w-4" />}
+                          </div>
+                        )}
                         {/* Status notification dot */}
                         {room.unreadCount && room.unreadCount > 0 ? (
-                          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 animate-ping" />
-                        ) : isDirect ? (() => {
-                          const otherMember = (room.members || []).find((m: any) => {
-                            const mId = m.userId || m.user?.id;
-                            return mId && mId !== currentUser?.id;
-                          });
-                          const otherMemberId = otherMember ? (otherMember.userId || otherMember.user?.id) : null;
-                          const isPartnerOnline = otherMemberId ? onlineUserIds.has(otherMemberId) : false;
-                          return isPartnerOnline ? (
-                            <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-slate-900 animate-pulse" title={translations[language].statusOnline} />
+                          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 animate-ping ring-1 ring-slate-900" />
+                        ) : isDirect ? (
+                          isPartnerOnline ? (
+                            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-1 ring-slate-900 animate-pulse" title={translations[language].statusOnline} />
                           ) : (
-                            <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-slate-500 ring-1 ring-slate-900" title={translations[language].statusOffline} />
-                          );
-                        })() : (
+                            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-slate-500 ring-1 ring-slate-900" title={translations[language].statusOffline} />
+                          )
+                        ) : (
                           groupOnlineCount > 0 && (
-                            <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-slate-900" title={`${groupOnlineCount} ${translations[language].statusOnline}`} />
+                            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-1 ring-slate-900" title={`${groupOnlineCount} ${translations[language].statusOnline}`} />
                           )
                         )}
                       </div>
@@ -4470,6 +4635,7 @@ export default function ClinicalPlatform() {
                   className="bg-slate-800 border border-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-teal-500"
                 >
                   <option value="teal">LINE Green (Default Theme)</option>
+                  <option value="line_pc">LINE on PC (Desktop Classic)</option>
                   <option value="navy">Royal Navy Compliance</option>
                   <option value="emerald">Emerald Healing</option>
                   <option value="light">LINE Sky Blue (Light Theme)</option>
@@ -4636,8 +4802,16 @@ export default function ClinicalPlatform() {
                     return (
                       <>
                         <div className="relative shrink-0">
-                          <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-400 flex items-center justify-center font-black text-sm sm:text-base shadow-sm">
-                            {activeRoom.name[0]}
+                          <div className={`h-9 w-9 sm:h-10 sm:w-10 ${activeRoom.type === 'DIRECT' ? 'rounded-full' : 'rounded-xl'} bg-teal-500/15 border border-teal-500/40 text-teal-400 flex items-center justify-center font-black text-sm sm:text-base shadow-sm overflow-hidden`}>
+                            {activeRoom.type === 'DIRECT' && otherMember?.user?.avatarUrl ? (
+                              <img
+                                src={otherMember.user.avatarUrl}
+                                alt={otherMember.user.firstName || activeRoom.name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              activeRoom.name[0]
+                            )}
                           </div>
                           {activeRoom.type === 'DIRECT' ? (
                             isPartnerOnline ? (
@@ -4794,7 +4968,7 @@ export default function ClinicalPlatform() {
                 {/* Tiled Forensic Security Watermark Overlay */}
                 <div className="pointer-events-none absolute inset-0 z-0 flex flex-wrap items-center justify-center gap-x-24 gap-y-32 overflow-hidden select-none p-10">
                   {Array.from({ length: 12 }).map((_, i) => (
-                    <div key={i} className={`flex flex-col items-center justify-center text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase rotate-[-30deg] select-none whitespace-nowrap ${currentTheme === 'light' ? 'text-slate-900/[0.06]' : 'text-slate-100/[0.04]'}`}>
+                    <div key={i} className={`flex flex-col items-center justify-center text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase rotate-[-30deg] select-none whitespace-nowrap ${currentTheme === 'light' || currentTheme === 'line_pc' ? 'text-slate-900/[0.06]' : 'text-slate-100/[0.04]'}`}>
                       <span className="flex items-center gap-2 mb-1 border-b border-current pb-1 px-4">
                         <Shield className="h-4 w-4" />
                         HOSPLY INTERNAL CHAT
