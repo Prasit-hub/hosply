@@ -165,7 +165,7 @@ export class AuthService {
     console.log(`[Auth Service] Registered new user "${trimmedUsername}" with default role "${staffRole.name}"`);
 
     const payload = { username: newUser.username, sub: newUser.id, role: staffRole.name };
-    const accessToken = jwt.sign(payload, this.jwtSecret, { expiresIn: '15m' });
+    const accessToken = jwt.sign(payload, this.jwtSecret, { expiresIn: '24h' });
     const refreshToken = jwt.sign(payload, this.jwtRefreshSecret, { expiresIn: '7d' });
 
     await prisma.session.create({
@@ -225,7 +225,7 @@ export class AuthService {
     console.log(`[Auth Service] Login successful for "${username}" (${user.role.name})`);
 
     const payload = { username: user.username, sub: user.id, role: user.role.name };
-    const accessToken = jwt.sign(payload, this.jwtSecret, { expiresIn: '15m' });
+    const accessToken = jwt.sign(payload, this.jwtSecret, { expiresIn: '24h' });
     
     // Rotation pattern: Generate refresh token and save session
     const refreshToken = jwt.sign(payload, this.jwtRefreshSecret, { expiresIn: '7d' });
@@ -270,7 +270,7 @@ export class AuthService {
       await prisma.session.delete({ where: { id: session.id } });
 
       const newPayload = { username: payload.username, sub: payload.sub, role: payload.role };
-      const newAccessToken = jwt.sign(newPayload, this.jwtSecret, { expiresIn: '15m' });
+      const newAccessToken = jwt.sign(newPayload, this.jwtSecret, { expiresIn: '24h' });
       const newRefreshToken = jwt.sign(newPayload, this.jwtRefreshSecret, { expiresIn: '7d' });
 
       await prisma.session.create({

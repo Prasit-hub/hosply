@@ -1822,9 +1822,13 @@ export default function ClinicalPlatform() {
           const contentType = res.headers.get('content-type') || '';
           if (contentType.includes('application/json')) {
             const errData = await res.json();
-            errMsg = errData.message || errMsg;
+            if (res.status === 401 || errData.message === 'Unauthorized') {
+              errMsg = 'Your login session has expired. Please sign out and sign in again to refresh your credentials.';
+            } else {
+              errMsg = errData.message || errMsg;
+            }
           } else if (res.status === 401) {
-            errMsg = 'Your session has expired. Please sign in again.';
+            errMsg = 'Your login session has expired. Please sign out and sign in again to refresh your credentials.';
           } else if (res.status === 413) {
             errMsg = 'File size exceeds server upload limit (max 4.5MB on Vercel Serverless).';
           } else {
