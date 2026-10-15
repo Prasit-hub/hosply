@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   MessageSquare,
   Users,
@@ -47,7 +47,8 @@ import {
   Power,
   History,
   Calendar,
-  Plus
+  Plus,
+  Maximize2
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
@@ -755,6 +756,8 @@ export default function ClinicalPlatform() {
   const [selectedAttachmentFile, setSelectedAttachmentFile] = useState<{ name: string; type: string; dataUrl: string; messageId?: string; attachmentId?: string } | null>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [previewingFile, setPreviewingFile] = useState<{ name: string; type: string; dataUrl: string; classification: string } | null>(null);
+  const [decryptedImageUrls, setDecryptedImageUrls] = useState<Record<string, string>>({});
+  const decryptingImageIdsRef = useRef<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Directory and Chat Creation
@@ -2341,9 +2344,17 @@ export default function ClinicalPlatform() {
         return {
           ...prev,
           messageId: data.messageId,
-          attachmentId: data.attachment.id,
+          attachmentId: data.attachment?.id,
         };
       });
+
+      // Cache dataUrl for immediate local rendering after send
+      if (data.attachment?.id && dataUrl) {
+        setDecryptedImageUrls((prev) => ({ ...prev, [data.attachment.id]: dataUrl }));
+      }
+      if (data.messageId && dataUrl) {
+        setDecryptedImageUrls((prev) => ({ ...prev, [data.messageId]: dataUrl }));
+      }
 
       if (originalFile.size > 100 * 1024 && originalFile.type.startsWith('image/')) {
         showToast(`Image encrypted & stored via Vercel Blob (${Math.round(file.size / 1024)} KB)`, 'success');
@@ -2363,6 +2374,42 @@ export default function ClinicalPlatform() {
 
     e.target.value = '';
   };
+
+  const loadDecryptedImage = useCallback(async (attachmentId: string, fileType: string, roomId: string) => {
+    if (!attachmentId || decryptingImageIdsRef.current.has(attachmentId)) return;
+    decryptingImageIdsRef.current.add(attachmentId);
+
+    try {
+      const token = currentUserRef.current?.accessToken || currentUser?.accessToken;
+      if (!token) return;
+
+      const res = await fetch(`${API_URL}/api/storage/download-url/${attachmentId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const absoluteUrl = `${API_URL}${data.url}`;
+
+      const fileRes = await fetch(absoluteUrl);
+      if (!fileRes.ok) return;
+
+      const encryptedArrayBuffer = await fileRes.arrayBuffer();
+      const decryptedArrayBuffer = await decryptFileClient(encryptedArrayBuffer, roomId);
+
+      const blob = new Blob([decryptedArrayBuffer], { type: fileType || 'image/jpeg' });
+      const localUrl = URL.createObjectURL(blob);
+
+      setDecryptedImageUrls((prev) => ({
+        ...prev,
+        [attachmentId]: localUrl,
+      }));
+    } catch (err) {
+      console.warn('[Decryption] Failed to auto-load image thumbnail:', err);
+    }
+  }, [currentUser]);
 
   const handleDownloadOrOpen = async (attachment: any, classification: string, action: 'DOWNLOAD' | 'OPEN') => {
     if (!activeRoom) return;
@@ -5178,83 +5225,117 @@ export default function ClinicalPlatform() {
 
                                 {/* Attachments rendering */}
                                 {msg.attachments && msg.attachments.length > 0 && (
-                                  <div className="mt-3 space-y-2 border-t border-slate-500/10 pt-2">
+                                  <div className="mt-2.5 space-y-2 border-t border-slate-500/10 pt-2">
                                     {msg.attachments.map((file: any, idx: number) => {
-                                      const fileName = file.fileName || file.name;
-                                      const fileType = file.fileType || file.type;
-                                      const isImage = fileType?.startsWith('image/');
-                                      const hasLocalUrl = !!file.dataUrl;
+                                      const fileName = file.fileName || file.name || 'attachment';
+                                      const fileType = file.fileType || file.type || '';
+                                      const isImage = fileType?.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(fileName);
+                                      const isPublicOrInternal = msg.classification === 'PUBLIC' || msg.classification === 'INTERNAL';
+                                      const fileId = file.id || file.attachmentId;
+                                      const cachedUrl = (fileId ? decryptedImageUrls[fileId] : null) || (file.messageId ? decryptedImageUrls[file.messageId] : null) || file.dataUrl;
 
-                                      return (
-                                        <div key={idx} className="space-y-1.5">
-                                          {isImage && hasLocalUrl ? (
-                                            /* LOCAL IMAGE CACHE PREVIEW */
-                                            <div className="rounded-lg overflow-hidden border border-slate-700/60 max-w-[260px] bg-slate-950/80 shadow-md">
-                                              <img
-                                                src={file.dataUrl}
-                                                alt={fileName}
-                                                className="w-full h-auto object-cover max-h-[180px] cursor-pointer hover:opacity-90 transition-all animate-fade-in"
-                                                onClick={() => setPreviewingFile({ name: fileName, type: fileType, dataUrl: file.dataUrl, classification: msg.classification })}
-                                              />
-                                            </div>
-                                          ) : (
-                                            /* SECURE FILE COMPONENT */
-                                            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 text-[11px] gap-2 max-w-[280px]">
-                                              <div className="flex items-center gap-2 truncate">
-                                                <div className="h-8 w-8 rounded-lg bg-slate-950 flex items-center justify-center text-teal-400 font-black text-[9px] shrink-0 border border-slate-800">
-                                                  {isImage ? 'IMG' : (fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf') ? 'PDF' : 'DOC')}
-                                                </div>
-                                                <div className="truncate">
-                                                  <p className="font-bold text-white truncate text-[10px]" title={fileName}>
-                                                    {fileName}
-                                                  </p>
-                                                  <span className="text-[8px] text-slate-500 uppercase tracking-wider block">
-                                                    {isImage ? 'Secure Image Asset' : (fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf') ? 'Secure PDF' : 'Secure File')}
-                                                  </span>
-                                                </div>
-                                              </div>
+                                      // Auto-load decrypted image if PUBLIC/INTERNAL image and not yet cached
+                                      if (isImage && isPublicOrInternal && !cachedUrl && fileId && activeRoom) {
+                                        loadDecryptedImage(fileId, fileType, activeRoom.id);
+                                      }
 
-                                              {/* Download / Open Logic */}
-                                              <div className="flex gap-1 shrink-0">
-                                                <button
-                                                  type="button"
-                                                  onClick={() => {
-                                                    if (file.id) {
-                                                      handleDownloadOrOpen(file, msg.classification, 'OPEN');
-                                                    } else {
-                                                      setPreviewingFile({
-                                                        name: fileName,
-                                                        type: fileType,
-                                                        dataUrl: file.dataUrl || '',
-                                                        classification: msg.classification,
-                                                      });
-                                                    }
-                                                  }}
-                                                  className="bg-slate-800 hover:bg-slate-700 text-teal-400 hover:text-teal-350 font-black text-[9px] px-2 py-1.5 rounded-lg border border-slate-700 transition-all tracking-wider uppercase"
+                                      if (isImage && isPublicOrInternal) {
+                                        return (
+                                          <div key={idx} className="mt-1">
+                                            {cachedUrl ? (
+                                              /* RESIZED CHAT INLINE IMAGE PREVIEW (Appropriately sized: max-w 280px, max-h 230px) */
+                                              <div className="relative group overflow-hidden rounded-xl sm:rounded-2xl border border-slate-700/50 bg-black/25 shadow-md max-w-[250px] sm:max-w-[280px]">
+                                                <img
+                                                  src={cachedUrl}
+                                                  alt={fileName}
+                                                  className="w-auto h-auto max-w-[250px] sm:max-w-[280px] max-h-[200px] sm:max-h-[230px] object-cover rounded-xl sm:rounded-2xl cursor-pointer transition-transform duration-300 group-hover:scale-[1.02]"
+                                                  onClick={() => setPreviewingFile({ name: fileName, type: fileType || 'image/jpeg', dataUrl: cachedUrl, classification: msg.classification })}
+                                                />
+                                                {/* Floating hover overlay with zoom and details */}
+                                                <div
+                                                  onClick={() => setPreviewingFile({ name: fileName, type: fileType || 'image/jpeg', dataUrl: cachedUrl, classification: msg.classification })}
+                                                  className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2.5 cursor-pointer"
                                                 >
-                                                  Open
-                                                </button>
-
-                                                {file.id ? (
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => handleDownloadOrOpen(file, msg.classification, 'DOWNLOAD')}
-                                                    className="bg-teal-500 hover:bg-teal-600 text-white font-black text-[9px] px-2 py-1.5 rounded-lg transition-all tracking-wider uppercase text-center"
-                                                  >
-                                                    Download
-                                                  </button>
-                                                ) : (
-                                                  <a
-                                                    href={file.dataUrl}
-                                                    download={fileName}
-                                                    className="bg-teal-500 hover:bg-teal-600 text-white font-black text-[9px] px-2 py-1.5 rounded-lg transition-all tracking-wider uppercase text-center flex items-center justify-center"
-                                                  >
-                                                    Download
-                                                  </a>
-                                                )}
+                                                  <p className="text-[11px] font-bold text-white truncate drop-shadow">{fileName}</p>
+                                                  <div className="flex items-center justify-between mt-0.5">
+                                                    <span className="text-[9px] text-teal-300 font-bold drop-shadow">
+                                                      {file.fileSize ? `${Math.round(file.fileSize / 1024)} KB` : 'Image'}
+                                                    </span>
+                                                    <span className="text-[9px] text-white bg-black/60 px-2 py-0.5 rounded-md font-bold flex items-center gap-1 shadow-sm">
+                                                      <Maximize2 className="h-2.5 w-2.5 text-teal-300" /> {language === 'TH' ? 'ดูภาพเต็ม' : 'View'}
+                                                    </span>
+                                                  </div>
+                                                </div>
                                               </div>
+                                            ) : (
+                                              /* Decrypting / Loading Skeleton */
+                                              <div className="w-52 h-32 rounded-xl sm:rounded-2xl border border-slate-700/40 bg-slate-800/40 flex flex-col items-center justify-center gap-2 p-3 text-slate-400 animate-pulse">
+                                                <div className="h-5 w-5 rounded-full border-2 border-teal-400 border-t-transparent animate-spin" />
+                                                <span className="text-[10px] font-bold tracking-wider text-slate-300">
+                                                  {language === 'TH' ? 'กำลังโหลดรูปภาพ...' : 'Loading image...'}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      }
+
+                                      /* SECURE FILE COMPONENT (Documents or Confidential/Restricted PHI) */
+                                      return (
+                                        <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 text-[11px] gap-2 max-w-[280px]">
+                                          <div className="flex items-center gap-2 truncate">
+                                            <div className="h-8 w-8 rounded-lg bg-slate-950 flex items-center justify-center text-teal-400 font-black text-[9px] shrink-0 border border-slate-800">
+                                              {isImage ? 'IMG' : (fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf') ? 'PDF' : 'DOC')}
                                             </div>
-                                          )}
+                                            <div className="truncate">
+                                              <p className="font-bold text-white truncate text-[10px]" title={fileName}>
+                                                {fileName}
+                                              </p>
+                                              <span className="text-[8px] text-slate-500 uppercase tracking-wider block">
+                                                {isImage ? (msg.classification === 'CONFIDENTIAL' ? 'Confidential Image (Encrypted)' : 'Restricted Image (Encrypted)') : (fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf') ? 'Secure PDF' : 'Secure File')}
+                                              </span>
+                                            </div>
+                                          </div>
+
+                                          {/* Download / Open Logic */}
+                                          <div className="flex gap-1 shrink-0">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                if (file.id) {
+                                                  handleDownloadOrOpen(file, msg.classification, 'OPEN');
+                                                } else {
+                                                  setPreviewingFile({
+                                                    name: fileName,
+                                                    type: fileType,
+                                                    dataUrl: file.dataUrl || '',
+                                                    classification: msg.classification,
+                                                  });
+                                                }
+                                              }}
+                                              className="bg-slate-800 hover:bg-slate-700 text-teal-400 hover:text-teal-350 font-black text-[9px] px-2 py-1.5 rounded-lg border border-slate-700 transition-all tracking-wider uppercase"
+                                            >
+                                              Open
+                                            </button>
+
+                                            {file.id ? (
+                                              <button
+                                                type="button"
+                                                onClick={() => handleDownloadOrOpen(file, msg.classification, 'DOWNLOAD')}
+                                                className="bg-teal-500 hover:bg-teal-600 text-white font-black text-[9px] px-2 py-1.5 rounded-lg transition-all tracking-wider uppercase text-center"
+                                              >
+                                                Download
+                                              </button>
+                                            ) : (
+                                              <a
+                                                href={file.dataUrl}
+                                                download={fileName}
+                                                className="bg-teal-500 hover:bg-teal-600 text-white font-black text-[9px] px-2 py-1.5 rounded-lg transition-all tracking-wider uppercase text-center flex items-center justify-center"
+                                              >
+                                                Download
+                                              </a>
+                                            )}
+                                          </div>
                                         </div>
                                       );
                                     })}
