@@ -8,7 +8,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
-  if (user.role !== 'Admin') {
+  const isAdmin = user.role?.toLowerCase().includes('admin');
+  if (!isAdmin) {
     return NextResponse.json({ message: 'Only Administrators can view audit logs' }, { status: 403 });
   }
 

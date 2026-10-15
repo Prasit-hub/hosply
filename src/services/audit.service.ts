@@ -1,4 +1,5 @@
 import { prisma } from '../lib/db';
+import { decrypt } from '../common/utils/crypto';
 
 export interface AuditLogDto {
   userId?: string;
@@ -37,9 +38,14 @@ export class AuditService {
 
     if (search) {
       where.OR = [
-        { action: { contains: search } },
-        { entity: { contains: search } },
-        { details: { contains: search } },
+        { action: { contains: search, mode: 'insensitive' } },
+        { entity: { contains: search, mode: 'insensitive' } },
+        { details: { contains: search, mode: 'insensitive' } },
+        {
+          user: {
+            username: { contains: search, mode: 'insensitive' },
+          },
+        },
       ];
     }
 
@@ -66,8 +72,42 @@ export class AuditService {
       prisma.auditLog.count({ where }),
     ]);
 
+    const mappedItems = items.map((item: any) => {
+      let user = null;
+      if (item.user) {
+        user = {
+          id: item.user.id,
+          username: item.user.username,
+          firstName: decrypt(item.user.firstName),
+          lastName: decrypt(item.user.lastName),
+          role: item.user.role?.name || 'Staff',
+        };
+      } else {
+        // Fallback: extract username if present in audit details JSON
+        try {
+          const parsed = typeof item.details === 'string' ? JSON.parse(item.details) : item.details;
+          if (parsed?.username || parsed?.performedBy) {
+            user = {
+              id: '',
+              username: parsed.username || parsed.performedBy,
+              firstName: '',
+              lastName: '',
+              role: parsed.role || 'Staff',
+            };
+          }
+        } catch {
+          // ignore parsing error
+        }
+      }
+
+      return {
+        ...item,
+        user,
+      };
+    });
+
     return {
-      items,
+      items: mappedItems,
       total,
       page,
       pages: Math.ceil(total / limit),

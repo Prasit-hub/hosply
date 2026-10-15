@@ -149,11 +149,12 @@ interface AuditLog {
   ipAddress: string;
   createdAt: string;
   user?: {
+    id?: string;
     username: string;
-    firstName: string;
-    lastName: string;
-    role: { name: string };
-  };
+    firstName?: string;
+    lastName?: string;
+    role?: { name: string } | string;
+  } | null;
 }
 
 const translations = {
@@ -3378,30 +3379,60 @@ export default function ClinicalPlatform() {
 
                   <div className="divide-y divide-slate-800 overflow-y-auto max-h-[350px] text-xs">
                     {auditLogs
-                      .filter((log) =>
-                        log.action.toLowerCase().includes(auditSearch.toLowerCase()) ||
-                        log.user?.username.toLowerCase().includes(auditSearch.toLowerCase())
-                      )
-                      .map((log) => (
-                        <div key={log.id} className="p-3 hover:bg-slate-800/30 transition-all flex justify-between items-start gap-4">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${log.action.includes('BLOCK') ? 'bg-red-950 text-red-400 border border-red-800/60' : 'bg-slate-800 text-slate-300'
+                      .filter((log) => {
+                        const q = auditSearch.toLowerCase();
+                        return (
+                          (log.action || '').toLowerCase().includes(q) ||
+                          (log.user?.username || '').toLowerCase().includes(q) ||
+                          (log.user?.firstName || '').toLowerCase().includes(q) ||
+                          (log.user?.lastName || '').toLowerCase().includes(q) ||
+                          (log.details || '').toLowerCase().includes(q)
+                        );
+                      })
+                      .map((log) => {
+                        const hasName = Boolean(log.user?.firstName || log.user?.lastName);
+                        const username = log.user?.username;
+                        const userRole = typeof log.user?.role === 'object' ? log.user?.role?.name : log.user?.role;
+
+                        return (
+                          <div key={log.id} className="p-3 hover:bg-slate-800/30 transition-all flex justify-between items-start gap-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                  log.action.includes('BLOCK') ? 'bg-red-950 text-red-400 border border-red-800/60' : 'bg-slate-800 text-slate-300'
                                 }`}>
-                                {log.action}
-                              </span>
-                              <span className="text-slate-400 font-semibold">
-                                by {log.user?.firstName} {log.user?.lastName} ({log.user?.username})
-                              </span>
+                                  {log.action}
+                                </span>
+                                <div className="text-slate-400 font-medium text-xs flex items-center gap-1.5 flex-wrap">
+                                  <span>by</span>
+                                  {hasName && (
+                                    <span className="text-slate-200 font-semibold">
+                                      {log.user?.firstName} {log.user?.lastName}
+                                    </span>
+                                  )}
+                                  {username ? (
+                                    <span className="font-mono text-teal-400 font-semibold bg-teal-950/40 border border-teal-800/40 px-1.5 py-0.5 rounded text-[11px]">
+                                      @{username}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-500 italic text-[11px]">System</span>
+                                  )}
+                                  {userRole && (
+                                    <span className="text-[9px] font-bold tracking-wider uppercase bg-slate-800 text-slate-400 border border-slate-700/60 px-1.5 py-0.5 rounded">
+                                      {getRoleLabel(userRole, language)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-slate-500 font-mono text-[10px] break-all">{log.details}</p>
                             </div>
-                            <p className="text-slate-500 font-mono text-[10px] break-all">{log.details}</p>
+                            <div className="text-right shrink-0 text-slate-500 text-[10px] space-y-0.5">
+                              <div className="flex items-center gap-1 justify-end"><Layers className="h-3 w-3" /> {log.ipAddress || 'unknown'}</div>
+                              <div>{new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+                            </div>
                           </div>
-                          <div className="text-right shrink-0 text-slate-500 text-[10px] space-y-0.5">
-                            <div className="flex items-center gap-1"><Layers className="h-3 w-3" /> {log.ipAddress}</div>
-                            <div>{new Date(log.createdAt).toLocaleTimeString()}</div>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 </div>
               </>
