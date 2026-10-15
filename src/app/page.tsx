@@ -289,8 +289,8 @@ const translations = {
   TH: {
     // Login
     loginTitle: 'เครือข่ายคลินิก Hosply',
-    loginSubtitle: 'ช่องทางส่งข้อความเข้ารหัสปลอดภัย AES-256 สำหรับทีมแพทย์และพยาบาล',
-    usernameLabel: 'ชื่อผู้ใช้งานระบบสุขภาพ',
+    loginSubtitle: 'ช่องทางส่งข้อความเข้ารหัสปลอดภัย AES-256',
+    usernameLabel: 'ชื่อผู้ใช้งานระบบ',
     usernamePlaceholder: 'doctor1 / nurse1 / pharmacist1 / admin1',
     passwordLabel: 'รหัสผ่านความปลอดภัย',
     passwordPlaceholder: '••••••••',
