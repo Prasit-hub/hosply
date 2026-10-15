@@ -3407,12 +3407,73 @@ export default function ClinicalPlatform() {
       </div>
 
       {/* 2. CHATS / DIRECTORY LIST SUBBAR (Middle Left) */}
-      <div className={`w-full md:w-80 bg-slate-900/60 border-r border-slate-800/80 flex-col shrink-0 pb-16 md:pb-0 ${(activeTab === 'admin' || activeTab === 'settings')
+      <div className={`w-full md:w-80 bg-slate-900/60 border-r border-slate-800/80 flex-col shrink-0 ${(activeTab === 'admin' || activeTab === 'settings')
           ? 'hidden md:hidden'
           : (activeRoom && activeTab === 'chats')
             ? 'hidden'
-            : 'flex'
+            : 'flex pb-20 md:pb-0'
         }`}>
+        {/* Mobile App Header Bar (Visible on mobile screens) */}
+        <div className="md:hidden h-14 px-4 bg-slate-900/95 border-b border-slate-800/80 flex items-center justify-between shrink-0 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-lg bg-teal-500 flex items-center justify-center text-white shadow-md shadow-teal-500/20">
+              <Activity className="h-4.5 w-4.5" />
+            </div>
+            <div>
+              <h1 className="font-black text-white text-base tracking-tight leading-none">hosply</h1>
+              <p className="text-[9px] text-teal-400 font-bold uppercase tracking-wider">Internal Message</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Language Toggle */}
+            <div className="flex items-center bg-slate-800/80 p-0.5 rounded-lg border border-slate-700/60">
+              <button
+                type="button"
+                onClick={() => changeLanguage('TH')}
+                className={`px-2 py-0.5 rounded text-[9px] font-black transition-all ${language === 'TH' ? 'bg-teal-500 text-white shadow' : 'text-slate-400'}`}
+              >
+                TH
+              </button>
+              <button
+                type="button"
+                onClick={() => changeLanguage('EN')}
+                className={`px-2 py-0.5 rounded text-[9px] font-black transition-all ${language === 'EN' ? 'bg-teal-500 text-white shadow' : 'text-slate-400'}`}
+              >
+                EN
+              </button>
+            </div>
+
+            {/* Quick Create Group Button */}
+            {activeTab === 'chats' && (
+              <button
+                type="button"
+                onClick={() => setShowCreateGroup(true)}
+                className="p-1.5 rounded-lg bg-teal-500/15 border border-teal-500/30 text-teal-400 hover:bg-teal-500 hover:text-white transition-all flex items-center justify-center"
+                title={translations[language].newGroupButton}
+              >
+                <UserPlus className="h-4 w-4" />
+              </button>
+            )}
+
+            {/* Current User Avatar */}
+            <div
+              onClick={() => handleTabChange('settings')}
+              className="relative cursor-pointer shrink-0"
+              title="Profile / Settings"
+            >
+              <div className="h-8 w-8 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center font-bold text-xs text-white overflow-hidden shadow-sm">
+                {currentUser?.avatarUrl ? (
+                  <img src={currentUser.avatarUrl} alt="Me" className="h-full w-full object-cover" />
+                ) : (
+                  currentUser?.firstName?.[0] || 'U'
+                )}
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-900" />
+            </div>
+          </div>
+        </div>
+
         {/* Search header */}
         <div className="p-4 border-b border-slate-800/60">
           <div className="relative">
@@ -3729,7 +3790,7 @@ export default function ClinicalPlatform() {
       </div>
 
       {/* 3. MAIN CENTER CHAT & PANELS (Switch depending on Tab) */}
-      <div className={`flex-1 flex bg-slate-950 overflow-hidden relative pb-16 md:pb-0 ${activeTab === 'directory'
+      <div className={`flex-1 flex bg-slate-950 overflow-hidden relative ${activeRoom && activeTab === 'chats' ? 'pb-0' : 'pb-16'} md:pb-0 ${activeTab === 'directory'
           ? 'hidden md:flex'
           : (!activeRoom && activeTab === 'chats')
             ? 'hidden md:flex'
@@ -3738,7 +3799,7 @@ export default function ClinicalPlatform() {
 
         {activeTab === 'admin' && currentUser.role === 'Admin' ? (
           /* --- ADMIN DASHBOARD CENTER VIEW --- */
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 md:pb-6 space-y-6">
             <div className="flex justify-between items-center border-b border-slate-800 pb-4">
               <div>
                 <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
@@ -4282,7 +4343,7 @@ export default function ClinicalPlatform() {
           </div>
         ) : activeTab === 'settings' ? (
           /* --- SETTINGS TAB --- */
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-2xl mx-auto">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 md:pb-6 space-y-6 max-w-2xl mx-auto">
             <h2 className="text-2xl font-black text-white tracking-tight border-b border-slate-800 pb-4">
               System Settings & Security Config
             </h2>
@@ -4532,12 +4593,12 @@ export default function ClinicalPlatform() {
             {/* COLUMN 1: CHAT FEED (Center) */}
             <div className="flex-1 flex flex-col justify-between bg-slate-950 border-r border-slate-800/80">
               {/* Chat room Header */}
-              <div className="h-20 px-6 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/50 backdrop-blur-md relative z-20">
-                <div className="flex items-center gap-4">
+              <div className="h-16 px-3 sm:px-6 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/50 backdrop-blur-md relative z-20">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                   {/* Back Button to Chats List */}
                   <button
                     onClick={() => setActiveRoom(null)}
-                    className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 hover:border-slate-600 active:scale-95 transition-all mr-1 flex items-center justify-center shadow-lg"
+                    className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 hover:border-slate-600 active:scale-95 transition-all shrink-0 flex items-center justify-center shadow-md mr-0.5"
                     title="Back to Chats"
                   >
                     <ArrowLeft className="h-4.5 w-4.5" />
@@ -4558,60 +4619,55 @@ export default function ClinicalPlatform() {
 
                     return (
                       <>
-                        <div className="relative">
-                          <div className="h-11 w-11 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-400 flex items-center justify-center font-black text-md shadow-md shadow-teal-500/10">
+                        <div className="relative shrink-0">
+                          <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-400 flex items-center justify-center font-black text-sm sm:text-base shadow-sm">
                             {activeRoom.name[0]}
                           </div>
                           {activeRoom.type === 'DIRECT' ? (
                             isPartnerOnline ? (
                               <>
-                                <span className="absolute -bottom-1 -right-1 block h-3.5 w-3.5 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-ping" />
-                                <span className="absolute -bottom-1 -right-1 block h-3.5 w-3.5 rounded-full bg-emerald-400 ring-2 ring-slate-900" />
+                                <span className="absolute -bottom-0.5 -right-0.5 block h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-ping" />
+                                <span className="absolute -bottom-0.5 -right-0.5 block h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-900" />
                               </>
                             ) : (
-                              <span className="absolute -bottom-1 -right-1 block h-3.5 w-3.5 rounded-full bg-slate-500 ring-2 ring-slate-900" />
+                              <span className="absolute -bottom-0.5 -right-0.5 block h-2.5 w-2.5 rounded-full bg-slate-500 ring-2 ring-slate-900" />
                             )
                           ) : (
                             groupOnlineCount > 0 ? (
                               <>
-                                <span className="absolute -bottom-1 -right-1 block h-3.5 w-3.5 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-ping" />
-                                <span className="absolute -bottom-1 -right-1 block h-3.5 w-3.5 rounded-full bg-emerald-400 ring-2 ring-slate-900" />
+                                <span className="absolute -bottom-0.5 -right-0.5 block h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-ping" />
+                                <span className="absolute -bottom-0.5 -right-0.5 block h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-900" />
                               </>
                             ) : (
-                              <span className="absolute -bottom-1 -right-1 block h-3.5 w-3.5 rounded-full bg-slate-500 ring-2 ring-slate-900" />
+                              <span className="absolute -bottom-0.5 -right-0.5 block h-2.5 w-2.5 rounded-full bg-slate-500 ring-2 ring-slate-900" />
                             )
                           )}
                         </div>
 
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[9px] text-teal-400 font-black uppercase tracking-widest bg-teal-950/50 border border-teal-800/40 px-2 py-0.5 rounded-md">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[9px] text-teal-400 font-black uppercase tracking-wider bg-teal-950/50 border border-teal-800/40 px-1.5 py-0.2 rounded">
                               {activeRoom.type === 'DIRECT' ? translations[language].directChatPrefix : activeRoom.type === 'PATIENT_CONTEXT' ? translations[language].patientChatPrefix : translations[language].groupChatPrefix}
                             </span>
                             {activeRoom.type === 'PATIENT_CONTEXT' && activeRoom.patientContext && (
-                              <div className="flex items-center gap-1.5">
-                                <span className="bg-sky-950 text-sky-400 font-mono text-[9px] px-1.5 py-0.5 rounded border border-sky-800/60 font-bold uppercase">
+                              <div className="flex items-center gap-1">
+                                <span className="bg-sky-950 text-sky-400 font-mono text-[9px] px-1.5 py-0.2 rounded border border-sky-800/60 font-bold uppercase">
                                   HN: {activeRoom.patientContext.hn}
-                                </span>
-                                <span className="bg-emerald-950 text-emerald-400 text-[9px] px-1.5 py-0.5 rounded border border-emerald-800/60 font-bold uppercase">
-                                  Active Stream
                                 </span>
                               </div>
                             )}
                           </div>
-                          <h3 className="text-base font-extrabold text-white tracking-tight mt-1 flex items-center gap-2">
-                            {activeRoom.name}
+                          <h3 className="text-xs sm:text-sm font-extrabold text-white tracking-tight mt-0.5 flex items-center gap-1.5 truncate">
+                            <span className="truncate">{activeRoom.name}</span>
                             {activeRoom.type === 'DIRECT' ? (
-                              <span className={`text-[10px] font-semibold flex items-center gap-1 ${isPartnerOnline ? 'text-emerald-400' : 'text-slate-400'
-                                }`}>
-                                <span className={`h-2 w-2 rounded-full ${isPartnerOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-                                {isPartnerOnline ? translations[language].statusOnline : translations[language].statusOffline}
+                              <span className={`text-[9px] font-semibold flex items-center gap-1 shrink-0 ${isPartnerOnline ? 'text-emerald-400' : 'text-slate-400'}`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${isPartnerOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                                <span className="hidden xs:inline">{isPartnerOnline ? translations[language].statusOnline : translations[language].statusOffline}</span>
                               </span>
                             ) : (
-                              <span className={`text-[10px] font-semibold flex items-center gap-1 ${groupOnlineCount > 0 ? 'text-emerald-400' : 'text-slate-400'
-                                }`}>
-                                <span className={`h-2 w-2 rounded-full ${groupOnlineCount > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-                                {groupOnlineCount} {translations[language].statusOnline}
+                              <span className={`text-[9px] font-semibold flex items-center gap-1 shrink-0 ${groupOnlineCount > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${groupOnlineCount > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                                <span className="hidden xs:inline">{groupOnlineCount} {translations[language].statusOnline}</span>
                               </span>
                             )}
                           </h3>
@@ -4622,11 +4678,11 @@ export default function ClinicalPlatform() {
                 </div>
 
                 {/* Right secure channel tags and avatars */}
-                <div className="flex items-center gap-3">
-                  {/* Member Avatars */}
+                <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-1">
+                  {/* Member Avatars (Hidden on mobile) */}
                   {activeRoom.members && activeRoom.type !== 'DIRECT' && (
-                    <div className="flex items-center -space-x-2 mr-2">
-                      {activeRoom.members.slice(0, 10).map((m: any) => {
+                    <div className="hidden lg:flex items-center -space-x-2 mr-2">
+                      {activeRoom.members.slice(0, 8).map((m: any) => {
                         const mId = m.userId || m.user?.id;
                         const isMemOnline = mId && onlineUserIds.has(mId);
                         const roleName = typeof m.user?.role === 'object' ? m.user?.role?.name : m.user?.role || 'Staff';
@@ -4643,14 +4699,13 @@ export default function ClinicalPlatform() {
                                 m.user?.firstName ? m.user.firstName[0] : 'U'
                               )}
                             </div>
-                            <span className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-slate-900 ${isMemOnline ? 'bg-emerald-400 ring-1 ring-emerald-400/40' : 'bg-slate-500'
-                              }`} />
+                            <span className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-slate-900 ${isMemOnline ? 'bg-emerald-400 ring-1 ring-emerald-400/40' : 'bg-slate-500'}`} />
                           </div>
                         );
                       })}
-                      {activeRoom.members.length > 10 && (
+                      {activeRoom.members.length > 8 && (
                         <div title="View All Members" onClick={() => { setRoomMembersModalTarget(activeRoom); setShowRoomMembersModal(true); }} className="h-7 w-7 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center font-bold text-[9px] text-teal-400 cursor-pointer hover:bg-slate-700 transition-colors shadow-sm">
-                          +{activeRoom.members.length - 10}
+                          +{activeRoom.members.length - 8}
                         </div>
                       )}
                     </div>
@@ -4658,55 +4713,60 @@ export default function ClinicalPlatform() {
 
                   {activeRoom.type !== 'DIRECT' && (
                     <>
+                      {/* History Button */}
                       <button
                         onClick={() => {
                           setGroupHistorySearchQuery('');
                           setGroupHistoryActiveTab('messages');
                           setShowGroupHistoryModal(true);
                         }}
-                        className="bg-slate-800 hover:bg-sky-500/20 text-sky-300 hover:text-sky-200 border border-slate-700 hover:border-sky-500/40 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 shrink-0 shadow-sm"
+                        className="bg-slate-800 hover:bg-sky-500/20 text-sky-300 hover:text-sky-200 border border-slate-700 hover:border-sky-500/40 p-2 sm:px-3 sm:py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 shrink-0 shadow-sm"
                         title={translations[language].groupHistoryButton}
                       >
-                        <History className="h-3.5 w-3.5 text-sky-400" />
-                        <span className="hidden sm:inline">{translations[language].groupHistoryButton}</span>
+                        <History className="h-4 w-4 sm:h-3.5 sm:w-3.5 text-sky-400" />
+                        <span className="hidden md:inline">{translations[language].groupHistoryButton}</span>
                       </button>
 
+                      {/* Manage Members Button */}
                       <button
                         onClick={() => {
                           setRoomMembersModalTarget(activeRoom);
                           setShowRoomMembersModal(true);
                         }}
-                        className="bg-slate-800 hover:bg-slate-700 text-teal-400 border border-slate-700 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 shrink-0 shadow-sm"
+                        className="bg-slate-800 hover:bg-slate-700 text-teal-400 border border-slate-700 p-2 sm:px-3 sm:py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 shrink-0 shadow-sm"
                         title={translations[language].manageMembersBtn}
                       >
-                        <Users className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">{translations[language].manageMembersBtn}</span>
+                        <Users className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                        <span className="hidden md:inline">{translations[language].manageMembersBtn}</span>
                       </button>
 
+                      {/* Invite Staff Button */}
                       <button
                         onClick={() => {
                           setInviteTargetRoom(activeRoom);
                           setShowInviteModal(true);
                         }}
-                        className="bg-teal-500 hover:bg-teal-600 text-white text-[10px] font-black uppercase tracking-wider px-3.5 py-1.5 rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 shadow-md shrink-0 animate-fade-in"
+                        className="bg-teal-500 hover:bg-teal-600 text-white text-[10px] font-black uppercase tracking-wider p-2 sm:px-3.5 sm:py-1.5 rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 shadow-md shrink-0"
+                        title={translations[language].inviteMemberButton}
                       >
-                        <UserPlus className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">{translations[language].inviteMemberButton}</span>
+                        <UserPlus className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                        <span className="hidden md:inline">{translations[language].inviteMemberButton}</span>
                       </button>
                     </>
                   )}
 
+                  {/* Clear Chat Button */}
                   <button
                     type="button"
                     onClick={() => openClearChatPrompt(activeRoom.id, activeRoom.name)}
                     title={translations[language].clearChat}
-                    className="bg-slate-800/80 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 border border-slate-700/60 hover:border-rose-500/40 text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shrink-0 shadow-sm"
+                    className="bg-slate-800/80 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 border border-slate-700/60 hover:border-rose-500/40 text-[10px] font-bold p-2 sm:px-3 sm:py-1.5 rounded-lg transition-all flex items-center gap-1.5 shrink-0 shadow-sm"
                   >
-                    <Trash2 className="h-3.5 w-3.5 text-rose-400" />
-                    <span className="hidden sm:inline">{translations[language].clearChat}</span>
+                    <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5 text-rose-400" />
+                    <span className="hidden lg:inline">{translations[language].clearChat}</span>
                   </button>
 
-                  <span className="bg-slate-800/80 text-slate-300 text-[10px] px-3 py-1.5 rounded-lg font-bold border border-slate-700/60 uppercase tracking-wider hidden md:flex items-center gap-1.5 shrink-0">
+                  <span className="bg-slate-800/80 text-slate-300 text-[10px] px-3 py-1.5 rounded-lg font-bold border border-slate-700/60 uppercase tracking-wider hidden xl:flex items-center gap-1.5 shrink-0">
                     <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse"></span>
                     {translations[language].nowConnected}
                   </span>
@@ -4714,7 +4774,7 @@ export default function ClinicalPlatform() {
               </div>
 
               {/* Message scroll container */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-2.5 relative line-chat-bg">
+              <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-2 sm:space-y-2.5 relative line-chat-bg">
                 {/* Tiled Forensic Security Watermark Overlay */}
                 <div className="pointer-events-none absolute inset-0 z-0 flex flex-wrap items-center justify-center gap-x-24 gap-y-32 overflow-hidden select-none p-10">
                   {Array.from({ length: 12 }).map((_, i) => (
@@ -5032,10 +5092,10 @@ export default function ClinicalPlatform() {
               </div>
 
               {/* Chat typing input bottombar */}
-              <div className="p-4 border-t border-slate-800 bg-slate-900/30">
+              <div className="p-2.5 sm:p-4 border-t border-slate-800 bg-slate-900/90 sm:bg-slate-900/30 backdrop-blur-md pb-safe">
                 {/* Realtime DLP Alerts warning bar popup */}
                 {dlpWarning && (
-                  <div className={`mb-3 p-3 rounded-lg border text-xs flex items-center justify-between transition-all ${dlpBlockMessage
+                  <div className={`mb-2.5 sm:mb-3 p-2.5 sm:p-3 rounded-xl border text-xs flex items-center justify-between transition-all ${dlpBlockMessage
                     ? 'bg-rose-950/40 border-rose-500/50 text-rose-300 shadow-md animate-bounce'
                     : 'bg-amber-950/40 border-amber-500/50 text-amber-300 shadow-md'
                     }`}>
@@ -5060,8 +5120,8 @@ export default function ClinicalPlatform() {
 
                 {/* Inactive Room Banner */}
                 {activeRoom.isActive === false && (
-                  <div className="mb-3 bg-amber-950/40 border border-amber-800/60 rounded-xl p-3 flex items-center justify-between text-xs animate-fade-in shadow-md">
-                    <div className="flex items-center gap-2.5 text-amber-300">
+                  <div className="mb-2.5 sm:mb-3 bg-amber-950/40 border border-amber-800/60 rounded-xl p-2.5 sm:p-3 flex items-center justify-between text-xs animate-fade-in shadow-md">
+                    <div className="flex items-center gap-2 text-amber-300">
                       <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-amber-400" />
                       <div>
                         <p className="font-bold text-xs">{translations[language].groupInactiveBanner}</p>
@@ -5074,7 +5134,7 @@ export default function ClinicalPlatform() {
                       <button
                         type="button"
                         onClick={() => handleToggleRoomActive(activeRoom.id, false)}
-                        className="bg-teal-500 hover:bg-teal-600 text-white font-bold text-[10px] uppercase px-3.5 py-1.5 rounded-lg shrink-0 transition-all shadow-md ml-3"
+                        className="bg-teal-500 hover:bg-teal-600 text-white font-bold text-[10px] uppercase px-3.5 py-1.5 rounded-lg shrink-0 transition-all shadow-md ml-2"
                       >
                         {translations[language].reactivateBtn}
                       </button>
@@ -5082,15 +5142,15 @@ export default function ClinicalPlatform() {
                   </div>
                 )}
 
-                <form onSubmit={handleSendMessage} className="space-y-3">
-                  <div className="flex items-center justify-between bg-slate-900/80 border border-slate-700/60 rounded-xl px-4 py-2 text-xs">
-                    <div className="flex items-center gap-2">
-                      <Lock className="h-3.5 w-3.5 text-teal-400" />
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{translations[language].classificationSelectLabel}</span>
+                <form onSubmit={handleSendMessage} className="space-y-2 sm:space-y-3">
+                  <div className="flex items-center justify-between bg-slate-900/80 border border-slate-700/60 rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 text-xs">
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
+                      <Lock className="h-3.5 w-3.5 text-teal-400 shrink-0" />
+                      <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0">{translations[language].classificationSelectLabel}</span>
                       <select
                         value={selectedClassification}
                         onChange={(e) => setSelectedClassification(e.target.value as any)}
-                        className="bg-slate-800 border border-slate-700 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded focus:outline-none focus:border-teal-500"
+                        className="bg-slate-800 border border-slate-700 text-white text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded focus:outline-none focus:border-teal-500 truncate"
                       >
                         <option value="PUBLIC">PUBLIC</option>
                         <option value="INTERNAL">INTERNAL (STAFF ONLY)</option>
@@ -5099,15 +5159,15 @@ export default function ClinicalPlatform() {
                       </select>
                     </div>
 
-                    <span className="text-[9px] text-slate-500 flex items-center gap-1 font-bold">
+                    <span className="text-[9px] text-slate-500 hidden sm:flex items-center gap-1 font-bold shrink-0 ml-2">
                       <Info className="h-3.5 w-3.5" /> {translations[language].classificationHelpText}
                     </span>
                   </div>
 
                   {/* Pending Attachment Preview Banner */}
                   {selectedAttachmentFile && (
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between animate-fade-in text-xs">
-                      <div className="flex items-center gap-3 truncate">
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 sm:p-3 flex items-center justify-between animate-fade-in text-xs">
+                      <div className="flex items-center gap-2.5 sm:gap-3 truncate">
                         {selectedAttachmentFile.type.startsWith('image/') ? (
                           <div className="h-10 w-10 rounded border border-slate-700 overflow-hidden shrink-0 bg-slate-950">
                             <img src={selectedAttachmentFile.dataUrl} className="h-full w-full object-cover" alt="selected preview" />
@@ -5123,11 +5183,11 @@ export default function ClinicalPlatform() {
                             {isUploadingFile ? (
                               <span className="text-teal-400 font-black animate-pulse flex items-center gap-1.5">
                                 <span className="h-2 w-2 rounded-full bg-teal-400 animate-ping"></span>
-                                Uploading to Secure Storage...
+                                Uploading...
                               </span>
                             ) : (
                               <span className="text-emerald-400 font-black flex items-center gap-1">
-                                ✓ Uploaded to server successfully
+                                ✓ Uploaded
                               </span>
                             )}
                           </span>
@@ -5144,7 +5204,7 @@ export default function ClinicalPlatform() {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     <input
                       type="file"
                       ref={fileInputRef}
@@ -5155,7 +5215,7 @@ export default function ClinicalPlatform() {
                       type="button"
                       disabled={isUploadingFile}
                       onClick={() => fileInputRef.current?.click()}
-                      className={`p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white rounded-xl transition-all ${isUploadingFile ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`p-2.5 sm:p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white rounded-xl transition-all shrink-0 ${isUploadingFile ? 'opacity-50 cursor-not-allowed' : ''}`}
                       title="Attach clinical document (Max 10MB, stored via Vercel Blob)"
                     >
                       {isUploadingFile ? (
@@ -5170,12 +5230,12 @@ export default function ClinicalPlatform() {
                       onChange={handleTypingEvent}
                       disabled={isUploadingFile || (activeRoom.isActive === false && currentUser?.role !== 'Admin')}
                       placeholder={activeRoom.isActive === false && currentUser?.role !== 'Admin' ? (language === 'TH' ? 'กลุ่มนี้ถูกปิดการใช้งานโดยผู้ดูแลระบบ (ไม่สามารถส่งข้อความได้)' : 'This group is inactive (Messaging disabled)') : translations[language].messagePlaceholder}
-                      className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-teal-500/80 placeholder-slate-500 text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="flex-1 min-w-0 bg-slate-900 border border-slate-800 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-xs focus:outline-none focus:border-teal-500/80 placeholder-slate-500 text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                     />
                     <button
                       type="submit"
                       disabled={!!dlpBlockMessage || isUploadingFile || (!messageInput.trim() && !selectedAttachmentFile) || (activeRoom.isActive === false && currentUser?.role !== 'Admin')}
-                      className={`p-3 bg-teal-500 hover:bg-teal-600 text-white rounded-xl transition-all shadow-md active:scale-95 ${dlpBlockMessage || isUploadingFile || (activeRoom.isActive === false && currentUser?.role !== 'Admin') ? 'opacity-30 cursor-not-allowed' : ''
+                      className={`p-2.5 sm:p-3 bg-teal-500 hover:bg-teal-600 text-white rounded-xl transition-all shadow-md active:scale-95 shrink-0 ${dlpBlockMessage || isUploadingFile || (activeRoom.isActive === false && currentUser?.role !== 'Admin') ? 'opacity-30 cursor-not-allowed' : ''
                         }`}
                     >
                       <Send className="h-4.5 w-4.5" />
@@ -5195,9 +5255,9 @@ export default function ClinicalPlatform() {
 
       {/* --- CREATE NEW DISCUSSION MODAL POPUP --- */}
       {showCreateGroup && (
-        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 max-w-md w-full p-6 rounded-2xl space-y-4 shadow-2xl clinical-glow">
-            <h3 className="text-lg font-black text-white flex items-center gap-2">
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 max-w-md w-full p-4 sm:p-6 rounded-2xl space-y-4 shadow-2xl clinical-glow max-h-[92vh] overflow-y-auto">
+            <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-teal-400" /> {translations[language].newRoomModalTitle}
             </h3>
 
@@ -5421,24 +5481,24 @@ export default function ClinicalPlatform() {
 
       {/* --- ROOM MEMBERS MANAGEMENT MODAL --- */}
       {showRoomMembersModal && roomMembersModalTarget && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 max-w-lg w-full p-6 rounded-2xl space-y-4 shadow-2xl clinical-glow">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-400 flex items-center justify-center font-black text-md">
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-slate-900 border border-slate-800 max-w-lg w-full p-4 sm:p-6 rounded-2xl space-y-4 shadow-2xl clinical-glow max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-400 flex items-center justify-center font-black text-md shrink-0">
                   {(roomMembersModalTarget.name || 'G')[0]}
                 </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-white tracking-tight flex items-center gap-2">
-                    {roomMembersModalTarget.name}
-                    <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${roomMembersModalTarget.isActive !== false
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm sm:text-base font-extrabold text-white tracking-tight flex items-center gap-2 truncate">
+                    <span className="truncate">{roomMembersModalTarget.name}</span>
+                    <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border shrink-0 ${roomMembersModalTarget.isActive !== false
                         ? 'bg-emerald-950/50 border-emerald-800 text-emerald-400'
                         : 'bg-rose-950/50 border-rose-800 text-rose-400'
                       }`}>
                       {roomMembersModalTarget.isActive !== false ? translations[language].statusActive : translations[language].statusInactive}
                     </span>
                   </h3>
-                  <p className="text-[10px] text-slate-400 font-medium">
+                  <p className="text-[10px] text-slate-400 font-medium truncate">
                     {translations[language].groupMembersTitle} ({(roomMembersModalTarget.members || []).length} {language === 'TH' ? 'สมาชิก' : 'members'})
                   </p>
                 </div>
@@ -5448,7 +5508,7 @@ export default function ClinicalPlatform() {
                   setShowRoomMembersModal(false);
                   setRoomMembersModalTarget(null);
                 }}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-all"
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-all shrink-0"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -5551,20 +5611,20 @@ export default function ClinicalPlatform() {
 
       {/* --- GROUP CHAT HISTORY & DETAILS MODAL --- */}
       {showGroupHistoryModal && activeRoom && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 max-w-2xl w-full p-6 rounded-2xl space-y-4 shadow-2xl clinical-glow max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-slate-900 border border-slate-800 max-w-2xl w-full p-4 sm:p-6 rounded-2xl space-y-3 sm:space-y-4 shadow-2xl clinical-glow max-h-[92vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="h-11 w-11 rounded-xl bg-sky-500/15 border border-sky-500/40 text-sky-400 flex items-center justify-center font-black text-lg">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+                <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-sky-500/15 border border-sky-500/40 text-sky-400 flex items-center justify-center font-black text-base sm:text-lg shrink-0">
                   {(activeRoom.name || 'G')[0]}
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-extrabold text-white tracking-tight">
+                    <h3 className="text-sm sm:text-base font-extrabold text-white tracking-tight truncate">
                       {activeRoom.name}
                     </h3>
-                    <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${
+                    <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border shrink-0 ${
                       activeRoom.isActive !== false
                         ? 'bg-emerald-950/50 border-emerald-800 text-emerald-400'
                         : 'bg-rose-950/50 border-rose-800 text-rose-400'
@@ -5572,14 +5632,14 @@ export default function ClinicalPlatform() {
                       {activeRoom.isActive !== false ? translations[language].statusActive : translations[language].statusInactive}
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                  <p className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">
                     {translations[language].groupHistoryModalTitle} • ID: <span className="font-mono text-slate-300">{activeRoom.id.substring(0, 8)}...</span>
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowGroupHistoryModal(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-all"
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-all shrink-0"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -5631,7 +5691,7 @@ export default function ClinicalPlatform() {
             </div>
 
             {/* Subtabs navigation */}
-            <div className="flex items-center gap-2 border-b border-slate-800 pb-2 shrink-0">
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-2 shrink-0 overflow-x-auto no-scrollbar">
               <button
                 onClick={() => setGroupHistoryActiveTab('messages')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
@@ -5888,9 +5948,9 @@ export default function ClinicalPlatform() {
 
       {/* --- HIPAA SECURE IN-APP INVITE CLINICAL STAFF MODAL --- */}
       {showInviteModal && inviteTargetRoom && (
-        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 max-w-md w-full p-6 rounded-2xl space-y-4 shadow-2xl clinical-glow animate-fade-in">
-            <h3 className="text-lg font-black text-white flex items-center gap-2">
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 max-w-md w-full p-4 sm:p-6 rounded-2xl space-y-4 shadow-2xl clinical-glow animate-fade-in max-h-[92vh] overflow-y-auto">
+            <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
               <UserPlus className="h-5 w-5 text-teal-400" /> {translations[language].inviteStaff}
             </h3>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
@@ -6222,13 +6282,20 @@ export default function ClinicalPlatform() {
       )}
 
       {/* LINE-Style Mobile Bottom Navigation Bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 flex justify-around items-center z-30 px-2 pb-safe">
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 justify-around items-center z-30 px-2 pb-safe ${activeRoom && activeTab === 'chats' ? 'hidden' : 'flex'}`}>
         <button
           onClick={() => handleTabChange('chats')}
-          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 ${activeTab === 'chats' ? 'text-teal-400 font-bold' : 'text-slate-400'}`}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 relative ${activeTab === 'chats' ? 'text-teal-400 font-bold' : 'text-slate-400'}`}
         >
-          <MessageSquare className="h-5 w-5" />
-          <span className="text-[10px]">Chats</span>
+          <div className="relative">
+            <MessageSquare className="h-5 w-5" />
+            {rooms.reduce((acc, r) => acc + (r.unreadCount || 0), 0) > 0 && (
+              <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[9px] font-bold h-4 min-w-[16px] px-1 rounded-full flex items-center justify-center animate-pulse">
+                {rooms.reduce((acc, r) => acc + (r.unreadCount || 0), 0)}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px]">{translations[language].tabChats}</span>
         </button>
 
         <button
@@ -6236,7 +6303,7 @@ export default function ClinicalPlatform() {
           className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 ${activeTab === 'directory' ? 'text-teal-400 font-bold' : 'text-slate-400'}`}
         >
           <Users className="h-5 w-5" />
-          <span className="text-[10px]">Directory</span>
+          <span className="text-[10px]">{translations[language].tabDirectory}</span>
         </button>
 
         {currentUser.role === 'Admin' && (
@@ -6245,7 +6312,7 @@ export default function ClinicalPlatform() {
             className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 ${activeTab === 'admin' ? 'text-teal-400 font-bold' : 'text-slate-400'}`}
           >
             <Shield className="h-5 w-5" />
-            <span className="text-[10px]">Admin</span>
+            <span className="text-[10px]">{translations[language].tabAdmin}</span>
           </button>
         )}
 
@@ -6254,7 +6321,7 @@ export default function ClinicalPlatform() {
           className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 ${activeTab === 'settings' ? 'text-teal-400 font-bold' : 'text-slate-400'}`}
         >
           <Settings className="h-5 w-5" />
-          <span className="text-[10px]">Settings</span>
+          <span className="text-[10px]">{translations[language].tabSettings}</span>
         </button>
       </div>
       {/* --- CUSTOM TOAST NOTIFICATION --- */}
