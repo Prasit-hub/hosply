@@ -3023,11 +3023,20 @@ export default function ClinicalPlatform() {
           }
 
           /* 2. Chat list subbar, Header, Typing bar, Modals */
-          .bg-slate-900\\/60, .bg-slate-900\\/50, .bg-slate-900\\/40, .bg-slate-900\\/30, .bg-slate-900\\/90, .bg-slate-900\\/95 {
+          .bg-slate-900\\/60, .bg-slate-900\\/50, .bg-slate-900\\/40, .bg-slate-900\\/30, .bg-slate-900\\/90, .bg-slate-900\\/95, .bg-slate-900\\/80, .sm\\:bg-slate-900\\/30 {
             background-color: #ffffff !important;
           }
           .bg-slate-900 {
             background-color: #ffffff !important;
+          }
+
+          /* Chat typing bottombar container */
+          div[class*="pb-safe"],
+          .border-t.bg-slate-900\\/90,
+          .border-t.border-slate-800 {
+            background-color: #ffffff !important;
+            border-color: #e5e7eb !important;
+            backdrop-filter: none !important;
           }
 
           /* Active Room Highlight in Room List */
@@ -3140,14 +3149,56 @@ export default function ClinicalPlatform() {
             color: #ffffff !important;
           }
 
-          /* 9. Inputs & Textareas */
-          input, select, textarea {
+          /* 9. Inputs & Textareas: Strictly pure white */
+          input,
+          input[type="text"],
+          input[type="password"],
+          input[type="search"],
+          textarea,
+          select,
+          .bg-slate-900 input,
+          input.bg-slate-900,
+          input.bg-slate-800\/50,
+          input.bg-slate-800,
+          .chat-message-textbox {
             background-color: #ffffff !important;
             color: #0f172a !important;
-            border-color: #d1d5db !important;
+            border-color: #cbd5e1 !important;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
           }
           input::placeholder, textarea::placeholder {
             color: #9ca3af !important;
+          }
+          input:focus, textarea:focus, .chat-message-textbox:focus {
+            background-color: #ffffff !important;
+            border-color: #06C755 !important;
+            box-shadow: 0 0 0 2px rgba(6, 199, 85, 0.2) !important;
+            outline: none !important;
+          }
+
+          /* Paperclip button & action icons in bottombar */
+          button[title*="Attach"],
+          button.bg-slate-900:not(.bg-teal-500) {
+            background-color: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            color: #64748b !important;
+          }
+          button[title*="Attach"]:hover,
+          button.bg-slate-900:not(.bg-teal-500):hover {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+            border-color: #94a3b8 !important;
+          }
+
+          /* Classification selector bar */
+          div.bg-slate-900\/80 {
+            background-color: #f8fafc !important;
+            border-color: #e2e8f0 !important;
+          }
+          div.bg-slate-900\/80 select {
+            background-color: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            color: #0f172a !important;
           }
 
           /* 10. Modals & Context Menus */
@@ -3363,10 +3414,10 @@ export default function ClinicalPlatform() {
           z-index: 0;
         }
         .line-read-badge {
-          font-size: 9px;
+          font-size: 11px;
           font-weight: 700;
           color: ${currentTheme === 'light' ? '#1e3a8a' : currentTheme === 'line_pc' ? '#ffffff' : '#06C755'} !important;
-          margin-bottom: 1px;
+          margin-bottom: 2px;
           letter-spacing: -0.01em;
         }
       `}</style>
@@ -5080,11 +5131,11 @@ export default function ClinicalPlatform() {
                         <div className="space-y-1 max-w-[70%]">
                           {/* Sender name (LINE UX: Only show name above other users' first incoming message) */}
                           {!isMe && !isPrevSame && (
-                            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 pl-1">
-                              <span className="font-extrabold text-slate-700 dark:text-slate-200">
+                            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 pl-1 mb-0.5">
+                              <span className="font-extrabold text-slate-700 dark:text-slate-200 text-xs sm:text-[13px]">
                                 {msg.sender.firstName} {msg.sender.lastName}
                               </span>
-                              <span className="text-[8px] font-black tracking-wider uppercase bg-slate-800/50 dark:bg-slate-800 text-slate-500 dark:text-teal-400 border border-slate-700/60 dark:border-slate-700 px-1.5 py-0.2 rounded-md">
+                              <span className="text-[9px] font-black tracking-wider uppercase bg-slate-800/50 dark:bg-slate-800 text-slate-500 dark:text-teal-400 border border-slate-700/60 dark:border-slate-700 px-1.5 py-0.5 rounded-md">
                                 {getRoleLabel(msg.sender.role, language)}
                               </span>
                             </div>
@@ -5106,24 +5157,24 @@ export default function ClinicalPlatform() {
 
                             {/* Unsent Message Indicator vs Normal Speech Bubble */}
                             {msg.deletedAt || msg.content === '[This message was unsent]' ? (
-                              <div className={`py-2 px-3.5 text-xs transition-all rounded-2xl shadow-sm border border-dashed border-slate-300 dark:border-slate-700/80 bg-slate-100/90 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 flex items-center gap-2 select-none backdrop-blur-sm ${isMe ? 'rounded-tr-none' : 'rounded-tl-none'
+                              <div className={`py-2 px-3.5 text-xs sm:text-sm transition-all rounded-2xl shadow-sm border border-dashed border-slate-300 dark:border-slate-700/80 bg-slate-100/90 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 flex items-center gap-2 select-none backdrop-blur-sm ${isMe ? 'rounded-tr-none' : 'rounded-tl-none'
                                 }`}>
                                 <Undo2 className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0 opacity-80" />
-                                <span className="italic font-medium text-[11px] tracking-wide text-slate-500 dark:text-slate-400">
+                                <span className="italic font-medium text-xs sm:text-[13px] tracking-wide text-slate-500 dark:text-slate-400">
                                   {isMe
                                     ? (language === 'TH' ? 'คุณได้ยกเลิกข้อความแล้ว' : 'You unsent a message')
                                     : (language === 'TH' ? 'ข้อความนี้ถูกยกเลิกแล้ว' : 'This message was unsent')}
                                 </span>
                               </div>
                             ) : (
-                              /* Speech Bubble */
-                              <div className={`p-3 text-xs leading-relaxed transition-all rounded-2xl shadow-sm ${lineClass} ${bubbleStyle}`}>
+                              /* Speech Bubble with enlarged readable font */
+                              <div className={`px-3.5 py-2.5 sm:px-4 sm:py-3 text-[14px] sm:text-[15px] leading-relaxed transition-all rounded-2xl shadow-sm ${lineClass} ${bubbleStyle}`}>
                                 {!isNormal && (
-                                  <div className="flex items-center gap-1.5 mb-1.5 border-b border-slate-500/10 pb-1 font-bold text-[9px] tracking-wider uppercase">
-                                    <Lock className="h-3 w-3 animate-pulse text-current" /> {msg.classification} SECURE
+                                  <div className="flex items-center gap-1.5 mb-1.5 border-b border-slate-500/10 pb-1 font-bold text-[10px] tracking-wider uppercase">
+                                    <Lock className="h-3.5 w-3.5 animate-pulse text-current" /> {msg.classification} SECURE
                                   </div>
                                 )}
-                                <p className="whitespace-pre-line font-medium leading-relaxed font-sans">{msg.content}</p>
+                                <p className="whitespace-pre-line font-medium leading-relaxed font-sans text-[14px] sm:text-[15px]">{msg.content}</p>
 
                                 {/* Attachments rendering */}
                                 {msg.attachments && msg.attachments.length > 0 && (
@@ -5229,9 +5280,9 @@ export default function ClinicalPlatform() {
                               const readCount = readMembers.length;
 
                               return (
-                                <div className="flex flex-col justify-end items-end text-[9px] text-slate-500 dark:text-slate-400 select-none leading-none pb-0.5 shrink-0 self-end">
+                                <div className="flex flex-col justify-end items-end text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 select-none leading-none pb-0.5 shrink-0 self-end">
                                   {isRead && (
-                                    <span className="line-read-badge animate-fade-in">
+                                    <span className="line-read-badge animate-fade-in text-[10px] sm:text-[11px]">
                                       {language === 'TH' ? 'อ่านแล้ว' : 'Read'}
                                       {isGroup && readCount > 1 ? ` ${readCount}` : ''}
                                     </span>
@@ -5240,7 +5291,7 @@ export default function ClinicalPlatform() {
                                 </div>
                               );
                             })() : (
-                              <div className="flex flex-col justify-end text-[9px] text-slate-500 dark:text-slate-400 select-none leading-none pb-0.5 shrink-0 self-end">
+                              <div className="flex flex-col justify-end text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 select-none leading-none pb-0.5 shrink-0 self-end">
                                 <span className="opacity-75">{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                               </div>
                             )}
@@ -5420,7 +5471,7 @@ export default function ClinicalPlatform() {
                       onChange={handleTypingEvent}
                       disabled={isUploadingFile || (activeRoom.isActive === false && currentUser?.role !== 'Admin')}
                       placeholder={activeRoom.isActive === false && currentUser?.role !== 'Admin' ? (language === 'TH' ? 'กลุ่มนี้ถูกปิดการใช้งานโดยผู้ดูแลระบบ (ไม่สามารถส่งข้อความได้)' : 'This group is inactive (Messaging disabled)') : translations[language].messagePlaceholder}
-                      className="flex-1 min-w-0 bg-slate-900 border border-slate-800 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-xs focus:outline-none focus:border-teal-500/80 placeholder-slate-500 text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="flex-1 min-w-0 bg-slate-900 border border-slate-800 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base focus:outline-none focus:border-teal-500/80 placeholder-slate-400 text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed chat-message-textbox"
                     />
                     <button
                       type="submit"
