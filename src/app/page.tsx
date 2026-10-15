@@ -51,7 +51,8 @@ import {
   Maximize2,
   Mic,
   MicOff,
-  Smile
+  Smile,
+  Edit3
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
@@ -4201,89 +4202,117 @@ export default function ClinicalPlatform() {
 
         {activeTab === 'admin' && currentUser.role === 'Admin' ? (
           /* --- ADMIN DASHBOARD CENTER VIEW --- */
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 md:pb-6 space-y-6">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
-              <div>
-                <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                  <Shield className="h-6 w-6 text-teal-400" /> Compliance & Management Console
-                </h2>
-                <p className="text-xs text-slate-400 mt-1">Real-time status of clinical logs and secure user directory auditing.</p>
+          <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 pb-24 md:pb-6 space-y-4 sm:space-y-6">
+            {/* Admin Header Bar (Responsive) */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 border-b border-slate-800 pb-3 sm:pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+                    <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-teal-400 shrink-0" />
+                    <span>Compliance & Management</span>
+                  </h2>
+                  <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
+                    {language === 'TH'
+                      ? 'ระบบตรวจสอบบันทึกความปลอดภัย จัดการรายชื่อบุคลากร และกลุ่มแชตคลินิก'
+                      : 'Real-time status of clinical logs, staff directory & group management.'}
+                  </p>
+                </div>
+                {/* Quick Logout Button for Mobile Admin */}
+                <button
+                  type="button"
+                  onClick={() => setShowLogoutConfirm(true)}
+                  className="lg:hidden p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 hover:text-rose-200 active:scale-95 transition-all flex items-center justify-center shrink-0 ml-2"
+                  title={translations[language].logoutButton}
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
               </div>
-              <div className="flex bg-slate-900 border border-slate-850 p-1.5 rounded-xl shrink-0">
+
+              {/* Sub-tabs pills (Equal 3-column grid on mobile, inline on desktop) */}
+              <div className="grid grid-cols-3 sm:flex bg-slate-900 border border-slate-800 p-1 rounded-xl shrink-0 shadow-inner">
                 <button
                   onClick={() => setAdminSubTab('compliance')}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${adminSubTab === 'compliance' ? 'bg-teal-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                  className={`px-2.5 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
+                    adminSubTab === 'compliance' ? 'bg-teal-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                  }`}
                 >
-                  Compliance & Audit
+                  <Shield className="h-3.5 w-3.5 shrink-0 hidden sm:inline" />
+                  <span className="truncate">{language === 'TH' ? 'ความปลอดภัย' : 'Compliance'}</span>
                 </button>
                 <button
                   onClick={() => setAdminSubTab('users')}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${adminSubTab === 'users' ? 'bg-teal-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                  className={`px-2.5 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
+                    adminSubTab === 'users' ? 'bg-teal-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                  }`}
                 >
-                  User Maintenance
+                  <Users className="h-3.5 w-3.5 shrink-0 hidden sm:inline" />
+                  <span className="truncate">{language === 'TH' ? 'ผู้ใช้งาน' : 'Staff'}</span>
                 </button>
                 <button
                   onClick={() => {
                     setAdminSubTab('groups');
                     fetchAdminGroups();
                   }}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${adminSubTab === 'groups' ? 'bg-teal-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                  className={`px-2.5 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
+                    adminSubTab === 'groups' ? 'bg-teal-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                  }`}
                 >
-                  {translations[language].manageGroupsTab}
+                  <Layers className="h-3.5 w-3.5 shrink-0 hidden sm:inline" />
+                  <span className="truncate">{language === 'TH' ? 'กลุ่มแชต' : 'Groups'}</span>
                 </button>
               </div>
             </div>
 
             {adminSubTab === 'compliance' ? (
               <>
-                {/* Gauges row */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-center gap-4">
-                    <div className="p-3 rounded-lg bg-teal-500/10 text-teal-400 glow-active">
-                      <Database className="h-6 w-6" />
+                {/* Gauges row (2 columns on mobile, 4 on desktop) */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+                  <div className="bg-slate-900 border border-slate-800 p-3 sm:p-4 rounded-xl flex items-center gap-2.5 sm:gap-4 shadow-sm">
+                    <div className="p-2 sm:p-3 rounded-lg bg-teal-500/10 text-teal-400 glow-active shrink-0">
+                      <Database className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Database</p>
-                      <h3 className="text-lg font-black text-white">SQLite + Prisma</h3>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-center gap-4">
-                    <div className="p-3 rounded-lg bg-rose-500/10 text-rose-400 glow-restricted">
-                      <AlertTriangle className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">DLP Intercepts</p>
-                      <h3 className="text-lg font-black text-white">{dlpAlertsCount} Blocked</h3>
+                    <div className="min-w-0">
+                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">Database</p>
+                      <h3 className="text-xs sm:text-base font-black text-white truncate">SQLite + Prisma</h3>
                     </div>
                   </div>
 
-                  <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-center gap-4">
-                    <div className="p-3 rounded-lg bg-sky-500/10 text-sky-400">
-                      <HardDrive className="h-6 w-6" />
+                  <div className="bg-slate-900 border border-slate-800 p-3 sm:p-4 rounded-xl flex items-center gap-2.5 sm:gap-4 shadow-sm">
+                    <div className="p-2 sm:p-3 rounded-lg bg-rose-500/10 text-rose-400 glow-restricted shrink-0">
+                      <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Storage Status</p>
-                      <h3 className="text-lg font-black text-white">{storageUsage.used} / {storageUsage.total}</h3>
+                    <div className="min-w-0">
+                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">DLP Intercepts</p>
+                      <h3 className="text-xs sm:text-base font-black text-white truncate">{dlpAlertsCount} Blocked</h3>
                     </div>
                   </div>
 
-                  <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-center gap-4">
-                    <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-400">
-                      <Clock className="h-6 w-6" />
+                  <div className="bg-slate-900 border border-slate-800 p-3 sm:p-4 rounded-xl flex items-center gap-2.5 sm:gap-4 shadow-sm">
+                    <div className="p-2 sm:p-3 rounded-lg bg-sky-500/10 text-sky-400 shrink-0">
+                      <HardDrive className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Concurrent Sessions</p>
-                      <h3 className="text-lg font-black text-white">{activeSessionsCount} active</h3>
+                    <div className="min-w-0">
+                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">Storage</p>
+                      <h3 className="text-xs sm:text-base font-black text-white truncate">{storageUsage.used} / {storageUsage.total}</h3>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900 border border-slate-800 p-3 sm:p-4 rounded-xl flex items-center gap-2.5 sm:gap-4 shadow-sm">
+                    <div className="p-2 sm:p-3 rounded-lg bg-emerald-500/10 text-emerald-400 shrink-0">
+                      <Clock className="h-5 w-5 sm:h-6 sm:w-6" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">Sessions</p>
+                      <h3 className="text-xs sm:text-base font-black text-white truncate">{activeSessionsCount} active</h3>
                     </div>
                   </div>
                 </div>
 
                 {/* Audit Logs browser */}
-                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col">
-                  <div className="p-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col shadow-xl">
+                  <div className="p-3.5 sm:p-4 border-b border-slate-800 bg-slate-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <h4 className="font-bold text-xs uppercase tracking-wider text-slate-300">Live Secure Audit Log Stream</h4>
-                    <div className="relative w-72">
+                    <div className="relative w-full sm:w-72">
                       <input
                         type="text"
                         value={auditSearch}
@@ -4295,7 +4324,7 @@ export default function ClinicalPlatform() {
                     </div>
                   </div>
 
-                  <div className="divide-y divide-slate-800 overflow-y-auto max-h-[350px] text-xs">
+                  <div className="divide-y divide-slate-800 overflow-y-auto max-h-[420px] text-xs">
                     {auditLogs
                       .filter((log) => {
                         const q = auditSearch.toLowerCase();
@@ -4313,10 +4342,10 @@ export default function ClinicalPlatform() {
                         const userRole = typeof log.user?.role === 'object' ? log.user?.role?.name : log.user?.role;
 
                         return (
-                          <div key={log.id} className="p-3 hover:bg-slate-800/30 transition-all flex justify-between items-start gap-4">
-                            <div className="space-y-1">
+                          <div key={log.id} className="p-3 hover:bg-slate-800/30 transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
+                            <div className="space-y-1 min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${log.action.includes('BLOCK') || log.action.includes('FAILED')
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${log.action.includes('BLOCK') || log.action.includes('FAILED')
                                     ? 'bg-rose-950 text-rose-400 border border-rose-800/60'
                                     : log.action.includes('LOGIN')
                                       ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
@@ -4349,9 +4378,9 @@ export default function ClinicalPlatform() {
                               </div>
                               <p className="text-slate-500 font-mono text-[10px] break-all">{log.details}</p>
                             </div>
-                            <div className="text-right shrink-0 text-slate-500 text-[10px] space-y-0.5">
-                              <div className="flex items-center gap-1 justify-end"><Layers className="h-3 w-3" /> {log.ipAddress || 'unknown'}</div>
-                              <div>{new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+                            <div className="flex items-center justify-between sm:justify-end gap-3 text-slate-500 text-[10px] pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-800/60 w-full sm:w-auto shrink-0">
+                              <span className="flex items-center gap-1 font-mono"><Layers className="h-3 w-3" /> {log.ipAddress || 'unknown'}</span>
+                              <span className="font-mono">{new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                             </div>
                           </div>
                         );
@@ -4379,14 +4408,15 @@ export default function ClinicalPlatform() {
               );
 
               return (
-                <div className="space-y-6">
-                  <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center bg-slate-900 border border-slate-800 p-5 rounded-xl">
-                    <div className="space-y-1">
-                      <h3 className="font-extrabold text-white text-sm">Active Staff Directory Management</h3>
-                      <p className="text-[11px] text-slate-400">Add, edit, or deactivate professional clinical credentials & system roles.</p>
+                <div className="space-y-4 sm:space-y-6">
+                  {/* Search and Action Bar */}
+                  <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-xl">
+                    <div className="space-y-0.5">
+                      <h3 className="font-extrabold text-white text-xs sm:text-sm">Active Staff Directory Management</h3>
+                      <p className="text-[10px] sm:text-[11px] text-slate-400">Add, edit, or deactivate professional clinical credentials & system roles.</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="relative w-64">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                      <div className="relative w-full sm:w-64">
                         <input
                           type="text"
                           value={userSearchQuery}
@@ -4406,7 +4436,7 @@ export default function ClinicalPlatform() {
                           setNewUserData({ username: '', password: '', firstName: '', lastName: '', professionalId: '', roleId: firstRoleId });
                           setShowAddUserModal(true);
                         }}
-                        className="bg-teal-500 hover:bg-teal-600 text-white text-xs font-bold uppercase px-4 py-2.5 rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-teal-500/10 active:scale-95 whitespace-nowrap shrink-0"
+                        className="bg-teal-500 hover:bg-teal-600 text-white text-xs font-bold uppercase px-4 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-teal-500/10 active:scale-95 whitespace-nowrap shrink-0"
                       >
                         <UserPlus className="h-4 w-4" /> Add Clinical User
                       </button>
@@ -4414,7 +4444,8 @@ export default function ClinicalPlatform() {
                   </div>
 
                   <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
-                    <div className="overflow-x-auto">
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block overflow-x-auto">
                       <table className="w-full text-left border-collapse">
                         <thead>
                           <tr className="bg-slate-950/80 text-[10px] text-slate-400 uppercase font-black tracking-wider border-b border-slate-800">
@@ -4498,14 +4529,92 @@ export default function ClinicalPlatform() {
                       </table>
                     </div>
 
+                    {/* Mobile Responsive Cards View */}
+                    <div className="md:hidden divide-y divide-slate-800/80">
+                      {paginatedUsers.length === 0 ? (
+                        <div className="p-8 text-center text-slate-500 text-xs">
+                          No clinical users found matching "{userSearchQuery}"
+                        </div>
+                      ) : (
+                        paginatedUsers.map((u) => (
+                          <div key={u.id} className="p-3.5 space-y-3 bg-slate-900/60 hover:bg-slate-800/40 transition-colors">
+                            {/* Top row: Avatar + Name + Status */}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="h-9 w-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-slate-300 uppercase shadow-sm overflow-hidden shrink-0">
+                                  {u.avatarUrl ? (
+                                    <img src={u.avatarUrl} alt={u.firstName} className="h-full w-full object-cover" />
+                                  ) : (
+                                    u.firstName ? u.firstName[0] : 'U'
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-extrabold text-white text-xs truncate">{u.firstName} {u.lastName}</p>
+                                  <p className="text-[10px] text-teal-400 font-mono truncate">@{u.username}</p>
+                                </div>
+                              </div>
+                              <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
+                                u.isActive ? 'bg-emerald-950/60 border-emerald-800/60 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400'
+                              }`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${u.isActive ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                                {u.isActive ? (language === 'TH' ? 'ปฏิบัติหน้าที่' : 'Active Duty') : (language === 'TH' ? 'ระงับ' : 'Deactivated')}
+                              </span>
+                            </div>
+
+                            {/* Bottom row: Role + ID + Edit Button */}
+                            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/60">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                  u.role === 'Admin'
+                                    ? 'bg-rose-950/40 text-rose-300 border-rose-800/50'
+                                    : u.role === 'Doctor'
+                                      ? 'bg-sky-950/40 text-sky-300 border-sky-800/50'
+                                      : 'bg-emerald-950/40 text-emerald-300 border-emerald-800/50'
+                                }`}>
+                                  {getRoleLabel(u.role, language)}
+                                </span>
+                                {u.professionalId && (
+                                  <span className="font-mono text-slate-400 text-[10px] bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                                    ID: {u.professionalId}
+                                  </span>
+                                )}
+                              </div>
+
+                              <button
+                                onClick={async () => {
+                                  await fetchAdminRoles();
+                                  setEditingUserData({
+                                    id: u.id,
+                                    username: u.username,
+                                    password: '',
+                                    firstName: u.firstName,
+                                    lastName: u.lastName,
+                                    professionalId: u.professionalId || '',
+                                    roleId: u.roleId,
+                                    isActive: u.isActive,
+                                  });
+                                  setShowEditUserModal(true);
+                                }}
+                                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-teal-300 font-bold px-3 py-1.5 rounded-lg transition-all text-[11px] active:scale-95 shrink-0 flex items-center gap-1 shadow-sm"
+                              >
+                                <Edit3 className="h-3 w-3" />
+                                <span>{language === 'TH' ? 'แก้ไขสิทธิ์' : 'Edit'}</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Pagination Bar (Responsive) */}
                     {filteredUsers.length > 0 && (
-                      <div className="bg-slate-950/40 border-t border-slate-800 px-6 py-4 flex items-center justify-between text-xs">
-                        <div className="text-slate-400 font-medium">
+                      <div className="bg-slate-950/40 border-t border-slate-800 px-4 sm:px-6 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                        <div className="text-slate-400 font-medium text-[11px] sm:text-xs text-center sm:text-left">
                           Showing <span className="text-white font-bold">{Math.min(filteredUsers.length, (userListPage - 1) * ITEMS_PER_PAGE + 1)}</span> to{' '}
                           <span className="text-white font-bold">{Math.min(filteredUsers.length, userListPage * ITEMS_PER_PAGE)}</span> of{' '}
                           <span className="text-white font-bold">{filteredUsers.length}</span> entries
                         </div>
-                        <div className="flex items-center gap-1.5 font-bold">
+                        <div className="flex items-center gap-1 font-bold">
                           <button
                             onClick={() => setUserListPage(1)}
                             disabled={userListPage === 1}
@@ -4517,35 +4626,19 @@ export default function ClinicalPlatform() {
                           <button
                             onClick={() => setUserListPage((prev) => Math.max(1, prev - 1))}
                             disabled={userListPage === 1}
-                            className="bg-slate-900 hover:bg-slate-800 border border-slate-800 disabled:opacity-30 disabled:hover:bg-slate-900 text-slate-300 px-3 py-1.5 rounded-lg transition-all active:scale-95 flex items-center gap-1"
+                            className="bg-slate-900 hover:bg-slate-800 border border-slate-800 disabled:opacity-30 disabled:hover:bg-slate-900 text-slate-300 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all active:scale-95 flex items-center gap-1 text-[11px]"
                           >
-                            <ChevronLeft className="h-4 w-4" /> Previous
+                            <ChevronLeft className="h-4 w-4" /> Prev
                           </button>
 
-                          {Array.from({ length: totalPages }, (_, i) => i + 1)
-                            .filter(page => Math.abs(page - userListPage) <= 1 || page === 1 || page === totalPages)
-                            .map((page, idx, arr) => {
-                              const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
-                              return (
-                                <React.Fragment key={page}>
-                                  {showEllipsis && <span className="text-slate-600 px-1">...</span>}
-                                  <button
-                                    onClick={() => setUserListPage(page)}
-                                    className={`px-3 py-1.5 rounded-lg transition-all border ${userListPage === page
-                                      ? 'bg-teal-500/10 text-teal-400 border-teal-500/40 shadow-md shadow-teal-500/5'
-                                      : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-400 hover:text-white'
-                                      }`}
-                                  >
-                                    {page}
-                                  </button>
-                                </React.Fragment>
-                              );
-                            })}
+                          <span className="px-2 text-slate-300 text-xs font-mono">
+                            {userListPage} / {totalPages}
+                          </span>
 
                           <button
                             onClick={() => setUserListPage((prev) => Math.min(totalPages, prev + 1))}
                             disabled={userListPage === totalPages}
-                            className="bg-slate-900 hover:bg-slate-800 border border-slate-800 disabled:opacity-30 disabled:hover:bg-slate-900 text-slate-300 px-3 py-1.5 rounded-lg transition-all active:scale-95 flex items-center gap-1"
+                            className="bg-slate-900 hover:bg-slate-800 border border-slate-800 disabled:opacity-30 disabled:hover:bg-slate-900 text-slate-300 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all active:scale-95 flex items-center gap-1 text-[11px]"
                           >
                             Next <ChevronRight className="h-4 w-4" />
                           </button>
@@ -4566,10 +4659,10 @@ export default function ClinicalPlatform() {
             })() : (
               /* --- GROUP MANAGEMENT SUBTAB --- */
               <div className="space-y-4">
-                {/* Search & Filter Header */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                  <div className="relative flex-1 max-w-md w-full">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+                {/* Search & Filter Header (Responsive) */}
+                <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 bg-slate-900 border border-slate-800 p-3.5 sm:p-4 rounded-xl">
+                  <div className="relative flex-1 w-full">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
                     <input
                       type="text"
                       placeholder={language === 'TH' ? 'ค้นหาชื่อกลุ่ม หรือ HN ผู้ป่วย...' : 'Search group name or patient HN...'}
@@ -4579,23 +4672,23 @@ export default function ClinicalPlatform() {
                     />
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <div className="flex bg-slate-950 border border-slate-800 p-1 rounded-lg text-xs font-bold">
+                  <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
+                    <div className="flex-1 sm:flex-initial flex bg-slate-950 border border-slate-800 p-1 rounded-lg text-xs font-bold justify-around">
                       <button
                         onClick={() => setAdminGroupFilter('ALL')}
-                        className={`px-3 py-1 rounded transition-all ${adminGroupFilter === 'ALL' ? 'bg-teal-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-3 py-1 rounded transition-all text-[11px] ${adminGroupFilter === 'ALL' ? 'bg-teal-500 text-white' : 'text-slate-400 hover:text-white'}`}
                       >
                         {language === 'TH' ? 'ทั้งหมด' : 'All'}
                       </button>
                       <button
                         onClick={() => setAdminGroupFilter('ACTIVE')}
-                        className={`px-3 py-1 rounded transition-all ${adminGroupFilter === 'ACTIVE' ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-3 py-1 rounded transition-all text-[11px] ${adminGroupFilter === 'ACTIVE' ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-white'}`}
                       >
                         {language === 'TH' ? 'ใช้งานอยู่' : 'Active'}
                       </button>
                       <button
                         onClick={() => setAdminGroupFilter('INACTIVE')}
-                        className={`px-3 py-1 rounded transition-all ${adminGroupFilter === 'INACTIVE' ? 'bg-rose-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-3 py-1 rounded transition-all text-[11px] ${adminGroupFilter === 'INACTIVE' ? 'bg-rose-500 text-white' : 'text-slate-400 hover:text-white'}`}
                       >
                         {language === 'TH' ? 'ปิดใช้งาน' : 'Inactive'}
                       </button>
@@ -4603,7 +4696,7 @@ export default function ClinicalPlatform() {
 
                     <button
                       onClick={fetchAdminGroups}
-                      className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 p-2 rounded-lg transition-all"
+                      className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 p-2 rounded-lg transition-all shrink-0 active:scale-95"
                       title="Refresh Groups"
                     >
                       <RotateCcw className="h-4 w-4" />
@@ -4611,134 +4704,258 @@ export default function ClinicalPlatform() {
                   </div>
                 </div>
 
-                {/* Groups Table */}
+                {/* Groups Container: Desktop Table + Mobile Cards */}
                 <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-950/70 border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-                      <tr>
-                        <th className="px-6 py-3.5">ชื่อกลุ่มแชต (Group Name)</th>
-                        <th className="px-6 py-3.5">ประเภท (Type)</th>
-                        <th className="px-6 py-3.5">สมาชิก (Members)</th>
-                        <th className="px-6 py-3.5">สถานะ (Status)</th>
-                        <th className="px-6 py-3.5 text-right">การจัดการ (Actions)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60">
-                      {adminGroups
-                        .filter((g) => {
-                          if (g.type === 'DIRECT') return false;
-                          const query = adminGroupSearch.toLowerCase();
-                          const matchesQuery = (g.name || '').toLowerCase().includes(query) || (g.patientContext?.hn || '').toLowerCase().includes(query);
-                          const matchesFilter =
-                            adminGroupFilter === 'ALL'
-                              ? true
-                              : adminGroupFilter === 'ACTIVE'
-                                ? g.isActive !== false
-                                : g.isActive === false;
-                          return matchesQuery && matchesFilter;
-                        })
-                        .map((g) => {
-                          const isRoomActive = g.isActive !== false;
-                          return (
-                            <tr key={g.id} className="hover:bg-slate-800/40 transition-colors">
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="h-9 w-9 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-400 flex items-center justify-center font-black text-sm">
-                                    {(g.name || 'G')[0]}
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-950/70 border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                        <tr>
+                          <th className="px-6 py-3.5">ชื่อกลุ่มแชต (Group Name)</th>
+                          <th className="px-6 py-3.5">ประเภท (Type)</th>
+                          <th className="px-6 py-3.5">สมาชิก (Members)</th>
+                          <th className="px-6 py-3.5">สถานะ (Status)</th>
+                          <th className="px-6 py-3.5 text-right">การจัดการ (Actions)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {adminGroups
+                          .filter((g) => {
+                            if (g.type === 'DIRECT') return false;
+                            const query = adminGroupSearch.toLowerCase();
+                            const matchesQuery = (g.name || '').toLowerCase().includes(query) || (g.patientContext?.hn || '').toLowerCase().includes(query);
+                            const matchesFilter =
+                              adminGroupFilter === 'ALL'
+                                ? true
+                                : adminGroupFilter === 'ACTIVE'
+                                  ? g.isActive !== false
+                                  : g.isActive === false;
+                            return matchesQuery && matchesFilter;
+                          })
+                          .map((g) => {
+                            const isRoomActive = g.isActive !== false;
+                            return (
+                              <tr key={g.id} className="hover:bg-slate-800/40 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="h-9 w-9 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-400 flex items-center justify-center font-black text-sm">
+                                      {(g.name || 'G')[0]}
+                                    </div>
+                                    <div>
+                                      <p className="font-bold text-white text-xs leading-tight">{g.name || 'Unnamed Room'}</p>
+                                      {g.patientContext && (
+                                        <p className="text-[10px] text-sky-400 font-mono mt-0.5">HN: {g.patientContext.hn}</p>
+                                      )}
+                                    </div>
                                   </div>
-                                  <div>
-                                    <p className="font-bold text-white text-xs leading-tight">{g.name || 'Unnamed Room'}</p>
-                                    {g.patientContext && (
-                                      <p className="text-[10px] text-sky-400 font-mono mt-0.5">HN: {g.patientContext.hn}</p>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider border ${g.type === 'DIRECT'
+                                      ? 'bg-slate-800 border-slate-700 text-slate-400'
+                                      : g.type === 'PATIENT_CONTEXT'
+                                        ? 'bg-sky-950/60 border-sky-800/60 text-sky-300'
+                                        : 'bg-teal-950/60 border-teal-800/60 text-teal-300'
+                                    }`}>
+                                    {g.type}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex -space-x-1.5 overflow-hidden">
+                                      {(g.members || []).slice(0, 4).map((m: any) => (
+                                        <div key={m.userId || m.user?.id} className="h-6 w-6 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center font-bold text-[8px] text-white uppercase overflow-hidden shrink-0">
+                                          {m.user?.avatarUrl ? (
+                                            <img src={m.user.avatarUrl} alt="avatar" className="h-full w-full object-cover" />
+                                          ) : (
+                                            (m.user?.firstName || 'U')[0]
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <span className="text-slate-400 font-bold text-[11px]">
+                                      {(g.members || []).length} {language === 'TH' ? 'คน' : 'members'}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border ${isRoomActive
+                                      ? 'bg-emerald-950/50 border-emerald-800/50 text-emerald-300'
+                                      : 'bg-rose-950/50 border-rose-800/50 text-rose-300'
+                                    }`}>
+                                    <span className={`h-1.5 w-1.5 rounded-full ${isRoomActive ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                                    {isRoomActive ? translations[language].statusActive : translations[language].statusInactive}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      onClick={() => {
+                                        setRoomMembersModalTarget(g);
+                                        setShowRoomMembersModal(true);
+                                      }}
+                                      className="bg-slate-800 hover:bg-slate-700 text-teal-400 border border-slate-700 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shadow-sm"
+                                      title={translations[language].manageMembersBtn}
+                                    >
+                                      <Users className="h-3 w-3" />
+                                      <span>{translations[language].manageMembersBtn}</span>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setInviteTargetRoom(g);
+                                        setShowInviteModal(true);
+                                      }}
+                                      className="bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 border border-teal-500/30 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shadow-sm"
+                                      title={translations[language].inviteStaff}
+                                    >
+                                      <UserPlus className="h-3 w-3" />
+                                      <span>{translations[language].inviteMemberButton}</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handleToggleRoomActive(g.id, isRoomActive)}
+                                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 border shadow-sm ${isRoomActive
+                                          ? 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border-rose-800/50'
+                                          : 'bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border-emerald-800/50'
+                                        }`}
+                                    >
+                                      <Power className="h-3 w-3" />
+                                      <span>{isRoomActive ? translations[language].deactivateGroup : translations[language].activateGroup}</span>
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        {adminGroups.filter(g => g.type !== 'DIRECT').length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="text-center py-10 text-slate-500">
+                              {language === 'TH' ? 'ไม่มีกลุ่มแชตในระบบ' : 'No group chats found in system'}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Responsive Cards View */}
+                  <div className="md:hidden divide-y divide-slate-800/80">
+                    {(() => {
+                      const filteredGroups = adminGroups.filter((g) => {
+                        if (g.type === 'DIRECT') return false;
+                        const query = adminGroupSearch.toLowerCase();
+                        const matchesQuery = (g.name || '').toLowerCase().includes(query) || (g.patientContext?.hn || '').toLowerCase().includes(query);
+                        const matchesFilter =
+                          adminGroupFilter === 'ALL'
+                            ? true
+                            : adminGroupFilter === 'ACTIVE'
+                              ? g.isActive !== false
+                              : g.isActive === false;
+                        return matchesQuery && matchesFilter;
+                      });
+
+                      if (filteredGroups.length === 0) {
+                        return (
+                          <div className="p-8 text-center text-slate-500 text-xs">
+                            {language === 'TH' ? 'ไม่พบกลุ่มแชตที่ค้นหา' : 'No group chats found'}
+                          </div>
+                        );
+                      }
+
+                      return filteredGroups.map((g) => {
+                        const isRoomActive = g.isActive !== false;
+                        return (
+                          <div key={g.id} className="p-3.5 space-y-3 bg-slate-900/60 hover:bg-slate-800/40 transition-colors">
+                            {/* Card Top: Icon, Name, HN, Status */}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="h-10 w-10 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-400 flex items-center justify-center font-black text-sm shrink-0">
+                                  {(g.name || 'G')[0]}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-extrabold text-white text-xs truncate leading-tight">{g.name || 'Unnamed Room'}</p>
+                                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                    <span className={`px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase border ${
+                                      g.type === 'PATIENT_CONTEXT'
+                                        ? 'bg-sky-950/60 border-sky-800/60 text-sky-300'
+                                        : 'bg-teal-950/60 border-teal-800/60 text-teal-300'
+                                    }`}>
+                                      {g.type === 'PATIENT_CONTEXT' ? 'PATIENT' : 'GROUP'}
+                                    </span>
+                                    {g.patientContext?.hn && (
+                                      <span className="text-[9px] text-sky-400 font-mono font-bold bg-sky-950/40 border border-sky-800/40 px-1 rounded">
+                                        HN: {g.patientContext.hn}
+                                      </span>
                                     )}
                                   </div>
                                 </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider border ${g.type === 'DIRECT'
-                                    ? 'bg-slate-800 border-slate-700 text-slate-400'
-                                    : g.type === 'PATIENT_CONTEXT'
-                                      ? 'bg-sky-950/60 border-sky-800/60 text-sky-300'
-                                      : 'bg-teal-950/60 border-teal-800/60 text-teal-300'
-                                  }`}>
-                                  {g.type}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="flex -space-x-1.5 overflow-hidden">
-                                    {(g.members || []).slice(0, 4).map((m: any) => (
-                                      <div key={m.userId || m.user?.id} className="h-6 w-6 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center font-bold text-[8px] text-white uppercase overflow-hidden shrink-0">
-                                        {m.user?.avatarUrl ? (
-                                          <img src={m.user.avatarUrl} alt="avatar" className="h-full w-full object-cover" />
-                                        ) : (
-                                          (m.user?.firstName || 'U')[0]
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <span className="text-slate-400 font-bold text-[11px]">
-                                    {(g.members || []).length} {language === 'TH' ? 'คน' : 'members'}
-                                  </span>
+                              </div>
+
+                              <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
+                                isRoomActive ? 'bg-emerald-950/50 border-emerald-800/50 text-emerald-300' : 'bg-rose-950/50 border-rose-800/50 text-rose-300'
+                              }`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${isRoomActive ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                                {isRoomActive ? translations[language].statusActive : translations[language].statusInactive}
+                              </span>
+                            </div>
+
+                            {/* Card Middle: Members avatar stack */}
+                            <div className="flex items-center justify-between text-[11px] text-slate-400 px-0.5">
+                              <div className="flex items-center gap-2">
+                                <div className="flex -space-x-1.5 overflow-hidden">
+                                  {(g.members || []).slice(0, 5).map((m: any) => (
+                                    <div key={m.userId || m.user?.id} className="h-5 w-5 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center font-bold text-[7px] text-white uppercase overflow-hidden shrink-0">
+                                      {m.user?.avatarUrl ? (
+                                        <img src={m.user.avatarUrl} alt="avatar" className="h-full w-full object-cover" />
+                                      ) : (
+                                        (m.user?.firstName || 'U')[0]
+                                      )}
+                                    </div>
+                                  ))}
                                 </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border ${isRoomActive
-                                    ? 'bg-emerald-950/50 border-emerald-800/50 text-emerald-300'
-                                    : 'bg-rose-950/50 border-rose-800/50 text-rose-300'
-                                  }`}>
-                                  <span className={`h-1.5 w-1.5 rounded-full ${isRoomActive ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                                  {isRoomActive ? translations[language].statusActive : translations[language].statusInactive}
+                                <span className="font-bold text-[10px] text-slate-400">
+                                  {(g.members || []).length} {language === 'TH' ? 'สมาชิก' : 'members'}
                                 </span>
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <button
-                                    onClick={() => {
-                                      setRoomMembersModalTarget(g);
-                                      setShowRoomMembersModal(true);
-                                    }}
-                                    className="bg-slate-800 hover:bg-slate-700 text-teal-400 border border-slate-700 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shadow-sm"
-                                    title={translations[language].manageMembersBtn}
-                                  >
-                                    <Users className="h-3 w-3" />
-                                    <span>{translations[language].manageMembersBtn}</span>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setInviteTargetRoom(g);
-                                      setShowInviteModal(true);
-                                    }}
-                                    className="bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 border border-teal-500/30 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shadow-sm"
-                                    title={translations[language].inviteStaff}
-                                  >
-                                    <UserPlus className="h-3 w-3" />
-                                    <span>{translations[language].inviteMemberButton}</span>
-                                  </button>
-                                  <button
-                                    onClick={() => handleToggleRoomActive(g.id, isRoomActive)}
-                                    className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 border shadow-sm ${isRoomActive
-                                        ? 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border-rose-800/50'
-                                        : 'bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border-emerald-800/50'
-                                      }`}
-                                  >
-                                    <Power className="h-3 w-3" />
-                                    <span>{isRoomActive ? translations[language].deactivateGroup : translations[language].activateGroup}</span>
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      {adminGroups.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="text-center py-10 text-slate-500">
-                            {language === 'TH' ? 'ไม่มีกลุ่มแชตในระบบ' : 'No group chats found in system'}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                              </div>
+                            </div>
+
+                            {/* Card Bottom: 3 responsive action buttons for thumbs */}
+                            <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-slate-800/60">
+                              <button
+                                onClick={() => {
+                                  setRoomMembersModalTarget(g);
+                                  setShowRoomMembersModal(true);
+                                }}
+                                className="bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center gap-1 active:scale-95 shadow-sm"
+                              >
+                                <Users className="h-3 w-3" />
+                                <span>{language === 'TH' ? 'สมาชิก' : 'Members'}</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setInviteTargetRoom(g);
+                                  setShowInviteModal(true);
+                                }}
+                                className="bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 border border-teal-500/30 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center gap-1 active:scale-95 shadow-sm"
+                              >
+                                <UserPlus className="h-3 w-3" />
+                                <span>{language === 'TH' ? 'เชิญ' : 'Invite'}</span>
+                              </button>
+                              <button
+                                onClick={() => handleToggleRoomActive(g.id, isRoomActive)}
+                                className={`py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center gap-1 border active:scale-95 shadow-sm ${
+                                  isRoomActive
+                                    ? 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border-rose-800/50'
+                                    : 'bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border-emerald-800/50'
+                                }`}
+                              >
+                                <Power className="h-3 w-3" />
+                                <span>{isRoomActive ? (language === 'TH' ? 'ระงับ' : 'Deactivate') : (language === 'TH' ? 'เปิดใช้งาน' : 'Activate')}</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
                 </div>
               </div>
             )}
