@@ -1954,7 +1954,7 @@ export default function ClinicalPlatform() {
 
   const fetchAuditLogs = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/audit`, {
+      const res = await fetch(`${API_URL}/api/admin/audit?limit=10`, {
         headers: { Authorization: `Bearer ${currentUser?.accessToken}` },
       });
       if (res.ok) {
@@ -4311,13 +4311,20 @@ export default function ClinicalPlatform() {
                 {/* Audit Logs browser */}
                 <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col shadow-xl">
                   <div className="p-3.5 sm:p-4 border-b border-slate-800 bg-slate-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <h4 className="font-bold text-xs uppercase tracking-wider text-slate-300">Live Secure Audit Log Stream</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-xs uppercase tracking-wider text-slate-300">
+                        {language === 'TH' ? '10 รายการบันทึกความปลอดภัยล่าสุด' : 'Live Secure Audit Logs'}
+                      </h4>
+                      <span className="bg-teal-500/15 border border-teal-500/30 text-teal-400 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
+                        {language === 'TH' ? '10 รายการล่าสุด' : '10 Latest'}
+                      </span>
+                    </div>
                     <div className="relative w-full sm:w-72">
                       <input
                         type="text"
                         value={auditSearch}
                         onChange={(e) => setAuditSearch(e.target.value)}
-                        placeholder="Search logs by action or user..."
+                        placeholder={language === 'TH' ? 'ค้นหาบันทึก หรือชื่อผู้ใช้...' : 'Search logs by action or user...'}
                         className="w-full bg-slate-800/80 border border-slate-700/80 rounded-lg py-1.5 pl-8 pr-4 text-xs text-white focus:outline-none focus:border-teal-500 placeholder-slate-500"
                       />
                       <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-500" />
@@ -4325,18 +4332,29 @@ export default function ClinicalPlatform() {
                   </div>
 
                   <div className="divide-y divide-slate-800 overflow-y-auto max-h-[420px] text-xs">
-                    {auditLogs
-                      .filter((log) => {
-                        const q = auditSearch.toLowerCase();
+                    {(() => {
+                      const displayedLogs = auditLogs
+                        .filter((log) => {
+                          const q = auditSearch.toLowerCase();
+                          return (
+                            (log.action || '').toLowerCase().includes(q) ||
+                            (log.user?.username || '').toLowerCase().includes(q) ||
+                            (log.user?.firstName || '').toLowerCase().includes(q) ||
+                            (log.user?.lastName || '').toLowerCase().includes(q) ||
+                            (log.details || '').toLowerCase().includes(q)
+                          );
+                        })
+                        .slice(0, 10);
+
+                      if (displayedLogs.length === 0) {
                         return (
-                          (log.action || '').toLowerCase().includes(q) ||
-                          (log.user?.username || '').toLowerCase().includes(q) ||
-                          (log.user?.firstName || '').toLowerCase().includes(q) ||
-                          (log.user?.lastName || '').toLowerCase().includes(q) ||
-                          (log.details || '').toLowerCase().includes(q)
+                          <div className="p-8 text-center text-slate-500 text-xs">
+                            {language === 'TH' ? 'ไม่พบบันทึกประวัติความปลอดภัย' : 'No audit logs found matching query'}
+                          </div>
                         );
-                      })
-                      .map((log) => {
+                      }
+
+                      return displayedLogs.map((log) => {
                         const hasName = Boolean(log.user?.firstName || log.user?.lastName);
                         const username = log.user?.username;
                         const userRole = typeof log.user?.role === 'object' ? log.user?.role?.name : log.user?.role;
@@ -4384,7 +4402,8 @@ export default function ClinicalPlatform() {
                             </div>
                           </div>
                         );
-                      })}
+                      });
+                    })()}
                   </div>
                 </div>
               </>
