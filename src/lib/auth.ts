@@ -18,12 +18,18 @@ export interface AuthenticatedUser {
 
 export async function verifyJwtAndGetUser(req: Request): Promise<AuthenticatedUser | null> {
   try {
-    const authHeader = req.headers.get('Authorization');
+    const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return null;
     }
     const token = authHeader.split(' ')[1];
-    const payload = jwt.verify(token, JWT_SECRET) as any;
+    let payload: any;
+    try {
+      payload = jwt.verify(token, JWT_SECRET);
+    } catch (err: any) {
+      console.warn('[Auth] JWT verification failed:', err.message);
+      return null;
+    }
     
     // Verify user is active in DB
     const user = await prisma.user.findUnique({
@@ -32,6 +38,7 @@ export async function verifyJwtAndGetUser(req: Request): Promise<AuthenticatedUs
     });
     
     if (!user || !user.isActive) {
+      console.warn('[Auth] User not found or inactive for token sub:', payload.sub);
       return null;
     }
     
@@ -41,9 +48,10 @@ export async function verifyJwtAndGetUser(req: Request): Promise<AuthenticatedUs
       firstName: decrypt(user.firstName),
       lastName: decrypt(user.lastName),
       role: user.role.name,
-      avatarUrl: user.avatarUrl || null,
+      avatarUrl: (user as any).avatarUrl || null,
     };
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[Auth] verifyJwtAndGetUser unexpected error:', error.message);
     return null;
   }
 }

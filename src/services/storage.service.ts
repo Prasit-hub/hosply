@@ -124,10 +124,9 @@ export class StorageService {
    * and clears user.avatarUrl in the database.
    */
   async deleteUserPhoto(userId: string): Promise<void> {
-    const user = await prisma.user.findUnique({
+    const user = (await prisma.user.findUnique({
       where: { id: userId },
-      select: { avatarUrl: true },
-    });
+    })) as any;
 
     if (user?.avatarUrl) {
       if (this.hasVercelBlob && (user.avatarUrl.includes('vercel-storage.com') || user.avatarUrl.includes('blob.vercel'))) {
@@ -152,7 +151,7 @@ export class StorageService {
 
     await prisma.user.update({
       where: { id: userId },
-      data: { avatarUrl: null },
+      data: { avatarUrl: null } as any,
     });
   }
 
@@ -387,6 +386,33 @@ export class StorageService {
       messageId: message.id,
       attachment: message.attachments[0],
     };
+  }
+
+  /**
+   * Physically removes an attachment file from Vercel Blob, Azure, or local disk
+   */
+  async deletePhysicalFile(storageKey: string): Promise<void> {
+    if (!storageKey) return;
+    try {
+      if (storageKey.startsWith('http://') || storageKey.startsWith('https://')) {
+        if (this.hasVercelBlob || storageKey.includes('vercel-storage.com') || storageKey.includes('blob.vercel')) {
+          await del(storageKey);
+          console.log(`[StorageService] Deleted attachment from Vercel Blob: ${storageKey}`);
+        }
+      } else if (this.connectionString && this.blobServiceClient) {
+        const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
+        await containerClient.deleteBlob(storageKey);
+        console.log(`[StorageService] Deleted attachment from Azure: ${storageKey}`);
+      } else {
+        const filePath = path.join(this.uploadDir, storageKey);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`[StorageService] Deleted local attachment file: ${filePath}`);
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[StorageService] Failed to delete physical file (${storageKey}):`, err.message);
+    }
   }
 }
 

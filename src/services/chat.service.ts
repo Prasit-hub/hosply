@@ -2,6 +2,7 @@ import { prisma } from '../lib/db';
 import { encrypt, decrypt } from '../common/utils/crypto';
 import { dlpService } from './dlp.service';
 import { auditService } from './audit.service';
+import { storageService } from './storage.service';
 
 export class ChatService {
   async getUserRooms(userId: string) {
@@ -92,7 +93,7 @@ export class ChatService {
       console.error('[ChatService] Failed to update lastReadAt in getRoomMessages:', err);
     }
 
-    const where: any = { roomId, deletedAt: null };
+    const where: any = { roomId };
     if (membership.clearedAt) {
       where.createdAt = { gt: membership.clearedAt };
     }
@@ -124,34 +125,50 @@ export class ChatService {
     const hasConfidentialAccess = userPermissions.includes('READ_CONFIDENTIAL');
     const hasRestrictedAccess = userPermissions.includes('READ_RESTRICTED');
 
-    const mappedMessages = messages.map(msg => {
-      let content = '';
+    const mappedMessages = (messages as any[])
+      .filter((msg: any) => {
+        // If message has deletedAt, only include it if it was individually unsent
+        if (msg.deletedAt) {
+          try {
+            const dec = decrypt(msg.content);
+            return dec === '[This message was unsent]';
+          } catch {
+            return false;
+          }
+        }
+        return true;
+      })
+      .map(msg => {
+        let content = '';
 
-      if (msg.classification === 'CONFIDENTIAL' && !hasConfidentialAccess) {
-        content = '[CONFIDENTIAL CLINICAL RECORD - Access Restricted]';
-      } else if (msg.classification === 'RESTRICTED' && !hasRestrictedAccess) {
-        content = '[RESTRICTED HIGH-SECURITY PHI - Elevated Permission Required]';
-      } else {
-        content = decrypt(msg.content);
-      }
+        if (msg.deletedAt) {
+          content = '[This message was unsent]';
+        } else if (msg.classification === 'CONFIDENTIAL' && !hasConfidentialAccess) {
+          content = '[CONFIDENTIAL CLINICAL RECORD - Access Restricted]';
+        } else if (msg.classification === 'RESTRICTED' && !hasRestrictedAccess) {
+          content = '[RESTRICTED HIGH-SECURITY PHI - Elevated Permission Required]';
+        } else {
+          content = decrypt(msg.content);
+        }
 
-      return {
-        ...msg,
-        content,
-        sender: {
-          ...msg.sender,
-          firstName: decrypt(msg.sender.firstName),
-          lastName: decrypt(msg.sender.lastName),
-          role: msg.sender.role.name,
-          avatarUrl: msg.sender.avatarUrl || null,
-        },
-      };
-    });
+        return {
+          ...msg,
+          content,
+          attachments: msg.deletedAt ? [] : msg.attachments,
+          sender: {
+            ...msg.sender,
+            firstName: decrypt(msg.sender.firstName),
+            lastName: decrypt(msg.sender.lastName),
+            role: msg.sender.role.name,
+            avatarUrl: msg.sender.avatarUrl || null,
+          },
+        };
+      });
 
     return mappedMessages.reverse();
   }
 
-  async clearRoomHistory(roomId: string, userId: string) {
+  async clearRoomHistory(roomId: string, userId: string, purgeAll = false, userRole?: string, ipAddress?: string) {
     const membership = await prisma.roomMember.findUnique({
       where: { roomId_userId: { roomId, userId } },
     });
@@ -160,10 +177,158 @@ export class ChatService {
       throw new Error('You are not a member of this chat room');
     }
 
-    return prisma.roomMember.update({
+    if (purgeAll) {
+      const isAdmin =
+        userRole?.toLowerCase() === 'admin' ||
+        userRole?.toLowerCase() === 'system_admin' ||
+        membership.role === 'ADMIN';
+
+      if (!isAdmin) {
+        throw new Error('Only room admins or system administrators can purge room messages for all members');
+      }
+
+      const now = new Date();
+
+      // Find attachments in this room to clean up physical storage
+      const messagesWithAttachments = await prisma.message.findMany({
+        where: { roomId, deletedAt: null },
+        include: { attachments: true },
+      });
+
+      for (const msg of messagesWithAttachments) {
+        if (msg.attachments && msg.attachments.length > 0) {
+          for (const att of msg.attachments) {
+            if (att.storageKey) {
+              await storageService.deletePhysicalFile(att.storageKey);
+            }
+          }
+        }
+      }
+
+      const updated = await prisma.message.updateMany({
+        where: { roomId, deletedAt: null },
+        data: { deletedAt: now },
+      });
+
+      await auditService.log({
+        userId,
+        action: 'ROOM_HISTORY_PURGED',
+        entity: 'ChatRoom',
+        entityId: roomId,
+        details: {
+          purgedMessageCount: updated.count,
+          purgedAt: now.toISOString(),
+        },
+        ipAddress,
+      });
+
+      return {
+        success: true,
+        purgedAll: true,
+        purgedCount: updated.count,
+        clearedAt: now,
+      };
+    }
+
+    // Default: Clear chat history locally for this user
+    const updatedMember = await prisma.roomMember.update({
       where: { roomId_userId: { roomId, userId } },
       data: { clearedAt: new Date() },
     });
+
+    await auditService.log({
+      userId,
+      action: 'ROOM_HISTORY_CLEARED_LOCAL',
+      entity: 'ChatRoom',
+      entityId: roomId,
+      details: {
+        clearedAt: updatedMember.clearedAt,
+      },
+      ipAddress,
+    });
+
+    return {
+      success: true,
+      purgedAll: false,
+      clearedAt: updatedMember.clearedAt,
+    };
+  }
+
+  async unsendMessage(messageId: string, userId: string, userRole?: string, ipAddress?: string) {
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        attachments: true,
+        room: {
+          include: {
+            members: true,
+          },
+        },
+      },
+    });
+
+    if (!message) {
+      throw new Error('Message not found');
+    }
+
+    if (message.deletedAt) {
+      throw new Error('Message has already been unsent');
+    }
+
+    const roomMembership = message.room.members.find((m: any) => m.userId === userId);
+    const isRoomAdmin = roomMembership?.role === 'ADMIN';
+    const isSender = message.senderId === userId;
+    const isSystemAdmin =
+      userRole?.toLowerCase() === 'admin' ||
+      userRole?.toLowerCase() === 'system_admin' ||
+      userRole?.toLowerCase() === 'administrator';
+
+    if (!isSender && !isSystemAdmin && !isRoomAdmin) {
+      throw new Error('Unauthorized: You can only unsend your own messages');
+    }
+
+    const now = new Date();
+    const updated = await prisma.message.update({
+      where: { id: messageId },
+      data: {
+        deletedAt: now,
+        content: encrypt('[This message was unsent]'),
+      },
+    });
+
+    // Clean up physical attachments if any
+    if (message.attachments && message.attachments.length > 0) {
+      for (const att of message.attachments) {
+        if (att.storageKey) {
+          try {
+            await storageService.deletePhysicalFile(att.storageKey);
+          } catch (e: any) {
+            console.warn('[ChatService] Failed to delete attachment physical file:', e.message);
+          }
+        }
+      }
+    }
+
+    // HIPAA/PDPA Audit logging
+    await auditService.log({
+      userId,
+      action: 'MESSAGE_UNSENT',
+      entity: 'Message',
+      entityId: messageId,
+      details: {
+        roomId: message.roomId,
+        wasSender: isSender,
+        isAdmin: isSystemAdmin || isRoomAdmin,
+        hadAttachments: (message.attachments?.length || 0) > 0,
+      },
+      ipAddress,
+    });
+
+    return {
+      messageId: message.id,
+      roomId: message.roomId,
+      deletedAt: updated.deletedAt,
+    };
   }
 
   async createRoom(dto: { name?: string; type: string; memberIds: string[]; patientHn?: string }, creatorId: string) {

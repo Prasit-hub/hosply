@@ -178,6 +178,46 @@ app.prepare().then(() => {
       }
     });
 
+    socket.on('unsendMessage', async (data: { messageId: string; roomId: string }) => {
+      if (!user) return;
+      try {
+        const ip = socket.handshake.address;
+        const result = await chatService.unsendMessage(data.messageId, user.id, user.role, ip);
+        io.to(`room_${data.roomId}`).emit('messageUnsent', {
+          messageId: result.messageId,
+          roomId: result.roomId,
+          deletedAt: result.deletedAt,
+        });
+      } catch (err: any) {
+        socket.emit('error', {
+          message: err.message || 'Failed to unsend message',
+        });
+      }
+    });
+
+    socket.on('clearRoom', async (data: { roomId: string; purgeAll?: boolean }) => {
+      if (!user) return;
+      try {
+        const ip = socket.handshake.address;
+        const result = await chatService.clearRoomHistory(data.roomId, user.id, data.purgeAll, user.role, ip);
+        if (result.purgedAll) {
+          io.to(`room_${data.roomId}`).emit('roomPurged', {
+            roomId: data.roomId,
+            clearedAt: result.clearedAt,
+          });
+        } else {
+          socket.emit('roomCleared', {
+            roomId: data.roomId,
+            clearedAt: result.clearedAt,
+          });
+        }
+      } catch (err: any) {
+        socket.emit('error', {
+          message: err.message || 'Failed to clear chat history',
+        });
+      }
+    });
+
     socket.on('typing', (data: { roomId: string; isTyping: boolean }) => {
       if (!user) return;
 

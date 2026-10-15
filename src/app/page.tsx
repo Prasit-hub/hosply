@@ -40,7 +40,9 @@ import {
   Trash2,
   LogIn,
   Camera,
-  UploadCloud
+  UploadCloud,
+  Undo2,
+  RotateCcw
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
@@ -126,6 +128,7 @@ interface Message {
   content: string;
   classification: 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED';
   createdAt: string;
+  deletedAt?: string | null;
   sender: {
     id: string;
     username: string;
@@ -200,6 +203,13 @@ const translations = {
     pinToTop: 'Pin to Top',
     unpinChat: 'Unpin Chat',
     clearHistory: 'Clear Chat History',
+    clearChat: 'Clear Chat',
+    unsendMessage: 'Unsend Message',
+    unsendConfirmTitle: 'Unsend Message',
+    unsendConfirmDesc: 'Are you sure you want to unsend this message? It will be removed for everyone in this chat.',
+    messageUnsentToast: 'Message was unsent',
+    clearForMe: 'Clear for Me Only',
+    purgeForAll: 'Purge All Messages for Everyone (Admin)',
     leaveGroup: 'Leave Group',
     inviteStaff: 'Invite Staff to Group',
     
@@ -335,6 +345,13 @@ const translations = {
     pinToTop: 'ปักหมุดไว้บนสุด',
     unpinChat: 'เลิกปักหมุด',
     clearHistory: 'ล้างประวัติการสนทนา',
+    clearChat: 'ล้างแชท',
+    unsendMessage: 'ยกเลิกการส่งข้อความ',
+    unsendConfirmTitle: 'ยกเลิกการส่งข้อความ',
+    unsendConfirmDesc: 'คุณแน่ใจหรือไม่ว่าต้องการยกเลิกการส่งข้อความนี้? ข้อความจะถูกลบออกจากทุกคนในการสนทนานี้',
+    messageUnsentToast: 'ยกเลิกการส่งข้อความแล้ว',
+    clearForMe: 'ล้างเฉพาะหน้าจอของฉัน',
+    purgeForAll: 'ล้างข้อความทั้งหมดสำหรับทุกคน (ผู้ดูแลระบบ)',
     leaveGroup: 'ออกจากกลุ่มแชท',
     inviteStaff: 'เชิญบุคลากรเข้ากลุ่ม',
     
@@ -441,7 +458,22 @@ export default function ClinicalPlatform() {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed && parsed.accessToken) {
-          setCurrentUser(parsed);
+          // Verify with backend to ensure token is not expired
+          fetch('/api/auth/profile', {
+            headers: { Authorization: `Bearer ${parsed.accessToken}` },
+          })
+            .then((res) => {
+              if (res.ok) {
+                setCurrentUser(parsed);
+              } else {
+                console.warn('[Session] Stored session expired or invalid, clearing local session...');
+                localStorage.removeItem('hosply_user_session');
+                setCurrentUser(null);
+              }
+            })
+            .catch(() => {
+              setCurrentUser(parsed);
+            });
         }
       }
     } catch (e) {
@@ -527,6 +559,8 @@ export default function ClinicalPlatform() {
     message: '',
     type: 'info',
   });
+
+  const [adminCleanupTarget, setAdminCleanupTarget] = useState<{ roomId: string; roomName?: string } | null>(null);
 
   const showClinicalModal = (
     title: string,
@@ -1112,6 +1146,37 @@ export default function ClinicalPlatform() {
       }
     });
 
+    socket.on('messageUnsent', (data: { messageId: string; roomId: string; deletedAt?: string }) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === data.messageId
+            ? {
+                ...m,
+                deletedAt: data.deletedAt || new Date().toISOString(),
+                content: '[This message was unsent]',
+                attachments: [],
+              }
+            : m
+        )
+      );
+      fetchRooms();
+    });
+
+    socket.on('roomCleared', (data: { roomId: string }) => {
+      if (activeRoomRef.current?.id === data.roomId) {
+        setMessages([]);
+      }
+      fetchRooms();
+    });
+
+    socket.on('roomPurged', (data: { roomId: string }) => {
+      if (activeRoomRef.current?.id === data.roomId) {
+        setMessages([]);
+      }
+      fetchRooms();
+      showToast('Room chat history was purged by administrator', 'info');
+    });
+
     socket.on('error', (err: any) => {
       showToast(`Server Blocked Action: ${err.message}`, 'error');
     });
@@ -1330,6 +1395,17 @@ export default function ClinicalPlatform() {
             setActiveRoom(data[0]);
           }
         }
+      } else if (res.status === 401) {
+        console.warn('[Session] Token expired or invalid (401), resetting session...');
+        localStorage.removeItem('hosply_user_session');
+        setCurrentUser(null);
+        showToast(
+          language === 'TH'
+            ? 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง'
+            : 'Your session has expired. Please log in again.',
+          'info'
+        );
+        return;
       } else {
         throw new Error();
       }
@@ -1415,6 +1491,11 @@ export default function ClinicalPlatform() {
           setMessages((prev) => [...data, ...prev]);
           setHasMoreMessages(data.length === limit);
         }
+      } else if (res.status === 401) {
+        console.warn('[Session] Token expired on fetchMessages (401)');
+        localStorage.removeItem('hosply_user_session');
+        setCurrentUser(null);
+        return;
       } else {
         throw new Error();
       }
@@ -1482,33 +1563,148 @@ export default function ClinicalPlatform() {
     await fetchMessages(activeRoom.id, false);
   };
 
-  const handleClearChatHistory = (roomId: string) => {
+  const openClearChatPrompt = (roomId: string, roomName?: string) => {
+    const isAdmin = currentUser?.role === 'Admin';
+    if (isAdmin) {
+      setAdminCleanupTarget({ roomId, roomName });
+    } else {
+      handleClearChatHistory(roomId, false);
+    }
+  };
+
+  const handleClearChatHistory = (roomId: string, purgeAll = false) => {
+    const title = purgeAll
+      ? (translations[language].purgeForAll || 'Purge All Messages for Everyone (Admin)')
+      : (translations[language].clearHistory || 'Clear Chat History');
+    const desc = purgeAll
+      ? (language === 'TH'
+          ? 'คุณกำลังจะลบข้อความทั้งหมดในห้องนี้สำหรับทุกคนอย่างถาวร (บันทึก Audit Log) ยืนยันหรือไม่?'
+          : 'Are you sure you want to permanently purge all messages in this room for everyone? An administrative audit log will be recorded.')
+      : (language === 'TH'
+          ? 'คุณแน่ใจหรือไม่ว่าต้องการล้างประวัติการสนทนานี้? ข้อความจะถูกลบออกจากหน้าจอของคุณเท่านั้น'
+          : 'Are you sure you want to clear your chat history for this room? This will only remove history from your screen.');
+
     showClinicalModal(
-      'Clear Chat History',
-      'Are you sure you want to clear your chat history for this direct message? This will only delete history on your screen, and cannot be undone.',
+      title,
+      desc,
       'confirm',
       async () => {
         try {
+          if (socketRef.current) {
+            socketRef.current.emit('clearRoom', { roomId, purgeAll });
+          }
+
           const res = await fetch(`${API_URL}/api/rooms/${roomId}/clear`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${currentUser?.accessToken}`,
+            },
+            body: JSON.stringify({ purgeAll }),
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.message || 'Failed to clear chat history');
+          }
+
+          showToast(purgeAll ? 'All room messages purged!' : 'Chat history cleared locally!', 'success');
+          
+          if (activeRoom && activeRoom.id === roomId) {
+            setMessages([]);
+          }
+          fetchRooms();
+        } catch (error: any) {
+          showClinicalModal(
+            'Action Blocked',
+            error.message || 'An error occurred while clearing history.',
+            'error'
+          );
+        }
+      }
+    );
+  };
+
+  const handleUnsendMessage = (msg: Message) => {
+    const isMe = msg.sender?.id === currentUser?.id || (msg as any).senderId === currentUser?.id;
+    const isAdmin = currentUser?.role?.toLowerCase().includes('admin');
+    if (!isMe && !isAdmin) return;
+
+    showClinicalModal(
+      translations[language].unsendConfirmTitle,
+      translations[language].unsendConfirmDesc,
+      'confirm',
+      async () => {
+        try {
+          // If the message is a local fallback or demo message (e.g. from mock room or offline state), remove locally
+          // If the message is a local fallback or demo message (e.g. from mock room or offline state), mark unsent locally
+          const isLocalOnly = !msg.id || msg.id.includes('.') || msg.id.startsWith('m') || msg.roomId.startsWith('room-');
+          if (isLocalOnly) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === msg.id
+                  ? {
+                      ...m,
+                      deletedAt: new Date().toISOString(),
+                      content: '[This message was unsent]',
+                      attachments: [],
+                    }
+                  : m
+              )
+            );
+            showToast(translations[language].messageUnsentToast, 'success');
+            return;
+          }
+
+          if (socketRef.current) {
+            socketRef.current.emit('unsendMessage', {
+              messageId: msg.id,
+              roomId: msg.roomId,
+            });
+          }
+
+          const res = await fetch(`${API_URL}/api/rooms/${msg.roomId}/messages/${msg.id}/unsend`, {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${currentUser?.accessToken}`,
             },
           });
 
-          if (!res.ok) {
-            throw new Error('Failed to clear chat history');
+          if (res.status === 401) {
+            localStorage.removeItem('hosply_user_session');
+            setCurrentUser(null);
+            showToast(
+              language === 'TH'
+                ? 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง'
+                : 'Session expired. Please log in again to unsend messages.',
+              'info'
+            );
+            return;
           }
 
-          showToast('Chat history cleared locally!', 'success');
-          
-          if (activeRoom && activeRoom.id === roomId) {
-            setMessages([]);
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.message || 'Failed to unsend message');
           }
+
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === msg.id
+                ? {
+                    ...m,
+                    deletedAt: new Date().toISOString(),
+                    content: '[This message was unsent]',
+                    attachments: [],
+                  }
+                : m
+            )
+          );
+          showToast(translations[language].messageUnsentToast, 'success');
+          fetchRooms();
         } catch (error: any) {
           showClinicalModal(
             'Action Blocked',
-            error.message || 'An error occurred while clearing history.',
+            error.message || 'Failed to unsend message',
             'error'
           );
         }
@@ -3748,6 +3944,17 @@ export default function ClinicalPlatform() {
                       <span className="hidden sm:inline">{translations[language].inviteMemberButton}</span>
                     </button>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={() => openClearChatPrompt(activeRoom.id, activeRoom.name)}
+                    title={translations[language].clearChat}
+                    className="bg-slate-800/80 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 border border-slate-700/60 hover:border-rose-500/40 text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shrink-0 shadow-sm"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-rose-400" />
+                    <span className="hidden sm:inline">{translations[language].clearChat}</span>
+                  </button>
+
                   <span className="bg-slate-800/80 text-slate-300 text-[10px] px-3 py-1.5 rounded-lg font-bold border border-slate-700/60 uppercase tracking-wider hidden md:flex items-center gap-1.5 shrink-0">
                     <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse"></span>
                     {translations[language].nowConnected}
@@ -3883,101 +4090,127 @@ export default function ClinicalPlatform() {
                           )}
 
                           {/* Content Bubble aligned with LINE Timestamp & Read Status */}
-                          <div className={`flex items-end gap-1.5 ${isMe ? 'flex-row-reverse' : ''}`}>
-                            {/* Speech Bubble */}
-                            <div className={`p-3 text-xs leading-relaxed transition-all rounded-2xl shadow-sm ${lineClass} ${bubbleStyle}`}>
-                              {!isNormal && (
-                                <div className="flex items-center gap-1.5 mb-1.5 border-b border-slate-500/10 pb-1 font-bold text-[9px] tracking-wider uppercase">
-                                  <Lock className="h-3 w-3 animate-pulse text-current" /> {msg.classification} SECURE
-                                </div>
-                              )}
-                              <p className="whitespace-pre-line font-medium leading-relaxed font-sans">{msg.content}</p>
+                          <div className={`flex items-end gap-1.5 ${isMe ? 'flex-row-reverse' : ''} group relative`}>
+                            {/* Unsend Action button (Sender or Admin) - Only when active */}
+                            {(isMe || currentUser?.role?.toLowerCase().includes('admin')) && !msg.deletedAt && msg.content !== '[This message was unsent]' && (
+                              <button
+                                type="button"
+                                onClick={() => handleUnsendMessage(msg)}
+                                title={translations[language].unsendMessage}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-slate-800/90 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/60 shadow-sm shrink-0 self-center"
+                              >
+                                <Undo2 className="h-3 w-3" />
+                              </button>
+                            )}
 
-                              {/* Attachments rendering */}
-                              {msg.attachments && msg.attachments.length > 0 && (
-                                <div className="mt-3 space-y-2 border-t border-slate-500/10 pt-2">
-                                  {msg.attachments.map((file: any, idx: number) => {
-                                    const fileName = file.fileName || file.name;
-                                    const fileType = file.fileType || file.type;
-                                    const isImage = fileType?.startsWith('image/');
-                                    const hasLocalUrl = !!file.dataUrl;
+                            {/* Unsent Message Indicator vs Normal Speech Bubble */}
+                            {msg.deletedAt || msg.content === '[This message was unsent]' ? (
+                              <div className={`py-2 px-3.5 text-xs transition-all rounded-2xl shadow-sm border border-dashed border-slate-300 dark:border-slate-700/80 bg-slate-100/90 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 flex items-center gap-2 select-none backdrop-blur-sm ${
+                                isMe ? 'rounded-tr-none' : 'rounded-tl-none'
+                              }`}>
+                                <Undo2 className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0 opacity-80" />
+                                <span className="italic font-medium text-[11px] tracking-wide text-slate-500 dark:text-slate-400">
+                                  {isMe
+                                    ? (language === 'TH' ? 'คุณได้ยกเลิกข้อความแล้ว' : 'You unsent a message')
+                                    : (language === 'TH' ? 'ข้อความนี้ถูกยกเลิกแล้ว' : 'This message was unsent')}
+                                </span>
+                              </div>
+                            ) : (
+                              /* Speech Bubble */
+                              <div className={`p-3 text-xs leading-relaxed transition-all rounded-2xl shadow-sm ${lineClass} ${bubbleStyle}`}>
+                                {!isNormal && (
+                                  <div className="flex items-center gap-1.5 mb-1.5 border-b border-slate-500/10 pb-1 font-bold text-[9px] tracking-wider uppercase">
+                                    <Lock className="h-3 w-3 animate-pulse text-current" /> {msg.classification} SECURE
+                                  </div>
+                                )}
+                                <p className="whitespace-pre-line font-medium leading-relaxed font-sans">{msg.content}</p>
 
-                                    return (
-                                      <div key={idx} className="space-y-1.5">
-                                        {isImage && hasLocalUrl ? (
-                                          /* LOCAL IMAGE CACHE PREVIEW */
-                                          <div className="rounded-lg overflow-hidden border border-slate-700/60 max-w-[260px] bg-slate-950/80 shadow-md">
-                                            <img
-                                              src={file.dataUrl}
-                                              alt={fileName}
-                                              className="w-full h-auto object-cover max-h-[180px] cursor-pointer hover:opacity-90 transition-all animate-fade-in"
-                                              onClick={() => setPreviewingFile({ name: fileName, type: fileType, dataUrl: file.dataUrl, classification: msg.classification })}
-                                            />
-                                          </div>
-                                        ) : (
-                                          /* SECURE FILE COMPONENT */
-                                          <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 text-[11px] gap-2 max-w-[280px]">
-                                            <div className="flex items-center gap-2 truncate">
-                                              <div className="h-8 w-8 rounded-lg bg-slate-950 flex items-center justify-center text-teal-400 font-black text-[9px] shrink-0 border border-slate-800">
-                                                {isImage ? 'IMG' : (fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf') ? 'PDF' : 'DOC')}
-                                              </div>
-                                              <div className="truncate">
-                                                <p className="font-bold text-white truncate text-[10px]" title={fileName}>
-                                                  {fileName}
-                                                </p>
-                                                <span className="text-[8px] text-slate-500 uppercase tracking-wider block">
-                                                  {isImage ? 'Secure Image Asset' : (fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf') ? 'Secure PDF' : 'Secure File')}
-                                                </span>
-                                              </div>
+                                {/* Attachments rendering */}
+                                {msg.attachments && msg.attachments.length > 0 && (
+                                  <div className="mt-3 space-y-2 border-t border-slate-500/10 pt-2">
+                                    {msg.attachments.map((file: any, idx: number) => {
+                                      const fileName = file.fileName || file.name;
+                                      const fileType = file.fileType || file.type;
+                                      const isImage = fileType?.startsWith('image/');
+                                      const hasLocalUrl = !!file.dataUrl;
+
+                                      return (
+                                        <div key={idx} className="space-y-1.5">
+                                          {isImage && hasLocalUrl ? (
+                                            /* LOCAL IMAGE CACHE PREVIEW */
+                                            <div className="rounded-lg overflow-hidden border border-slate-700/60 max-w-[260px] bg-slate-950/80 shadow-md">
+                                              <img
+                                                src={file.dataUrl}
+                                                alt={fileName}
+                                                className="w-full h-auto object-cover max-h-[180px] cursor-pointer hover:opacity-90 transition-all animate-fade-in"
+                                                onClick={() => setPreviewingFile({ name: fileName, type: fileType, dataUrl: file.dataUrl, classification: msg.classification })}
+                                              />
                                             </div>
+                                          ) : (
+                                            /* SECURE FILE COMPONENT */
+                                            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 text-[11px] gap-2 max-w-[280px]">
+                                              <div className="flex items-center gap-2 truncate">
+                                                <div className="h-8 w-8 rounded-lg bg-slate-950 flex items-center justify-center text-teal-400 font-black text-[9px] shrink-0 border border-slate-800">
+                                                  {isImage ? 'IMG' : (fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf') ? 'PDF' : 'DOC')}
+                                                </div>
+                                                <div className="truncate">
+                                                  <p className="font-bold text-white truncate text-[10px]" title={fileName}>
+                                                    {fileName}
+                                                  </p>
+                                                  <span className="text-[8px] text-slate-500 uppercase tracking-wider block">
+                                                    {isImage ? 'Secure Image Asset' : (fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf') ? 'Secure PDF' : 'Secure File')}
+                                                  </span>
+                                                </div>
+                                              </div>
 
-                                            {/* Download / Open Logic */}
-                                            <div className="flex gap-1 shrink-0">
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  if (file.id) {
-                                                    handleDownloadOrOpen(file, msg.classification, 'OPEN');
-                                                  } else {
-                                                    setPreviewingFile({
-                                                      name: fileName,
-                                                      type: fileType,
-                                                      dataUrl: file.dataUrl || '',
-                                                      classification: msg.classification,
-                                                    });
-                                                  }
-                                                }}
-                                                className="bg-slate-800 hover:bg-slate-700 text-teal-400 hover:text-teal-350 font-black text-[9px] px-2 py-1.5 rounded-lg border border-slate-700 transition-all tracking-wider uppercase"
-                                              >
-                                                Open
-                                              </button>
-
-                                              {file.id ? (
+                                              {/* Download / Open Logic */}
+                                              <div className="flex gap-1 shrink-0">
                                                 <button
                                                   type="button"
-                                                  onClick={() => handleDownloadOrOpen(file, msg.classification, 'DOWNLOAD')}
-                                                  className="bg-teal-500 hover:bg-teal-600 text-white font-black text-[9px] px-2 py-1.5 rounded-lg transition-all tracking-wider uppercase text-center"
+                                                  onClick={() => {
+                                                    if (file.id) {
+                                                      handleDownloadOrOpen(file, msg.classification, 'OPEN');
+                                                    } else {
+                                                      setPreviewingFile({
+                                                        name: fileName,
+                                                        type: fileType,
+                                                        dataUrl: file.dataUrl || '',
+                                                        classification: msg.classification,
+                                                      });
+                                                    }
+                                                  }}
+                                                  className="bg-slate-800 hover:bg-slate-700 text-teal-400 hover:text-teal-350 font-black text-[9px] px-2 py-1.5 rounded-lg border border-slate-700 transition-all tracking-wider uppercase"
                                                 >
-                                                  Download
+                                                  Open
                                                 </button>
-                                              ) : (
-                                                <a
-                                                  href={file.dataUrl}
-                                                  download={fileName}
-                                                  className="bg-teal-500 hover:bg-teal-600 text-white font-black text-[9px] px-2 py-1.5 rounded-lg transition-all tracking-wider uppercase text-center flex items-center justify-center"
-                                                >
-                                                  Download
-                                                </a>
-                                              )}
+
+                                                {file.id ? (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => handleDownloadOrOpen(file, msg.classification, 'DOWNLOAD')}
+                                                    className="bg-teal-500 hover:bg-teal-600 text-white font-black text-[9px] px-2 py-1.5 rounded-lg transition-all tracking-wider uppercase text-center"
+                                                  >
+                                                    Download
+                                                  </button>
+                                                ) : (
+                                                  <a
+                                                    href={file.dataUrl}
+                                                    download={fileName}
+                                                    className="bg-teal-500 hover:bg-teal-600 text-white font-black text-[9px] px-2 py-1.5 rounded-lg transition-all tracking-wider uppercase text-center flex items-center justify-center"
+                                                  >
+                                                    Download
+                                                  </a>
+                                                )}
+                                              </div>
                                             </div>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
 
                             {/* LINE signature Meta Info Stack next to bubble */}
                             {isMe ? (() => {
@@ -4330,18 +4563,16 @@ export default function ClinicalPlatform() {
             <span>{pinnedRoomIds.includes(contextMenu.room.id) ? translations[language].unpinChat : translations[language].pinToTop}</span>
           </button>
 
-          {contextMenu.room.type === 'DIRECT' && (
-            <button
-              onClick={() => {
-                handleClearChatHistory(contextMenu.room.id);
-                setContextMenu(null);
-              }}
-              className="w-full text-left px-3 py-2 hover:bg-red-950/40 hover:text-red-400 flex items-center gap-2 transition-all text-rose-500/80"
-            >
-              <Trash2 className="h-4 w-4 text-rose-400" />
-              <span>{translations[language].clearHistory}</span>
-            </button>
-          )}
+          <button
+            onClick={() => {
+              openClearChatPrompt(contextMenu.room.id, contextMenu.room.name);
+              setContextMenu(null);
+            }}
+            className="w-full text-left px-3 py-2 hover:bg-red-950/40 hover:text-red-400 flex items-center gap-2 transition-all text-rose-500/80"
+          >
+            <Trash2 className="h-4 w-4 text-rose-400" />
+            <span>{translations[language].clearHistory}</span>
+          </button>
 
           {contextMenu.room.type !== 'DIRECT' && (
             <button
@@ -4778,6 +5009,70 @@ export default function ClinicalPlatform() {
             {toast.type === 'error' && <AlertTriangle className="h-4 w-4 shrink-0" />}
             {toast.type === 'info' && <Info className="h-4 w-4 shrink-0" />}
             <span className="text-xs font-bold whitespace-nowrap">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* --- ADMINISTRATIVE ROOM CLEANUP DIALOG --- */}
+      {adminCleanupTarget && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-rose-500/30 bg-slate-900/95 shadow-2xl shadow-rose-950/20 p-6 relative overflow-hidden flex flex-col items-center text-center">
+            {/* Glowing top line */}
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-amber-500 via-rose-500 to-red-600" />
+
+            <div className="h-12 w-12 rounded-full flex items-center justify-center mb-4 border bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-lg shadow-rose-900/25">
+              <Trash2 className="h-5 w-5 text-rose-400 animate-pulse" />
+            </div>
+
+            <h3 className="text-sm font-black mb-1.5 tracking-wide uppercase text-white">
+              {translations[language].clearChat}
+            </h3>
+
+            <p className="text-xs font-semibold text-teal-400 mb-2">
+              {adminCleanupTarget.roomName || 'Active Room'}
+            </p>
+
+            <p className="text-[11px] text-slate-400 leading-relaxed mb-6 max-w-[340px]">
+              {language === 'TH'
+                ? 'ในฐานะผู้ดูแลระบบ คุณสามารถเลือกระหว่างการล้างประวัติเฉพาะหน้าจอของคุณ หรือลบข้อความทั้งหมดในห้องนี้สำหรับสมาชิกทุกคน (Audit Logged)'
+                : 'As an administrator, you can choose to clear history for your screen only, or permanently purge all messages in this room for everyone with an audit log.'}
+            </p>
+
+            <div className="flex flex-col w-full gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const target = adminCleanupTarget;
+                  setAdminCleanupTarget(null);
+                  handleClearChatHistory(target.roomId, false);
+                }}
+                className="w-full py-2.5 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 transition-all text-[11px] font-bold flex items-center justify-center gap-2"
+              >
+                <Trash2 className="h-3.5 w-3.5 text-slate-400" />
+                <span>{translations[language].clearForMe}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const target = adminCleanupTarget;
+                  setAdminCleanupTarget(null);
+                  handleClearChatHistory(target.roomId, true);
+                }}
+                className="w-full py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-all text-[11px] font-bold flex items-center justify-center gap-2 shadow-lg shadow-rose-950/20"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
+                <span>{translations[language].purgeForAll}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAdminCleanupTarget(null)}
+                className="w-full py-2 rounded-xl text-slate-400 hover:text-white transition-all text-[10px] font-semibold tracking-wider mt-1"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
