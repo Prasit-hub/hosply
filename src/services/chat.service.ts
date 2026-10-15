@@ -7,7 +7,15 @@ import { storageService } from './storage.service';
 export class ChatService {
   async getUserRooms(userId: string) {
     const memberships = await prisma.roomMember.findMany({
-      where: { userId },
+      where: {
+        userId,
+        room: {
+          OR: [
+            { type: { not: 'GROUP' } },
+            { isActive: true },
+          ],
+        },
+      },
       include: {
         room: {
           include: {

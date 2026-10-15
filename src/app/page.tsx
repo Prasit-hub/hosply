@@ -1304,9 +1304,14 @@ export default function ClinicalPlatform() {
     socket.on('roomStatusUpdated', (data: { roomId: string; isActive: boolean; roomName?: string }) => {
       setRooms((prev) => prev.map((r) => r.id === data.roomId ? { ...r, isActive: data.isActive } : r));
       if (activeRoomRef.current?.id === data.roomId) {
-        setActiveRoom((prev) => prev ? { ...prev, isActive: data.isActive } : null);
+        if (!data.isActive) {
+          setActiveRoom(null);
+        } else {
+          setActiveRoom((prev) => prev ? { ...prev, isActive: data.isActive } : null);
+        }
       }
       setAdminGroups((prev) => prev.map((g) => g.id === data.roomId ? { ...g, isActive: data.isActive } : g));
+      fetchRooms();
       showToast(`สถานะกลุ่มแชตถูกปรับเป็น ${data.isActive ? 'เปิดใช้งาน (Active)' : 'ปิดใช้งาน (Inactive)'}`, 'info');
     });
 
@@ -1555,13 +1560,15 @@ export default function ClinicalPlatform() {
         const data = await res.json();
         setRooms(data);
 
-        // Keep current active room if it exists
+        // Keep current active room if it exists and is still active
         const currentActive = activeRoomRef.current || activeRoom;
         if (currentActive) {
           const freshActive = data.find((r: any) => r.id === currentActive.id);
-          if (freshActive) {
+          if (freshActive && (freshActive.type !== 'GROUP' || freshActive.isActive !== false)) {
             setActiveRoom(freshActive);
             return;
+          } else if (freshActive && freshActive.type === 'GROUP' && freshActive.isActive === false) {
+            setActiveRoom(null);
           }
         }
 
@@ -1570,14 +1577,15 @@ export default function ClinicalPlatform() {
           hasInitialRoomLoadedRef.current = true;
           const lastRoomId = localStorage.getItem('hosply_last_room_id');
           if (lastRoomId) {
-            const lastRoom = data.find((r: any) => r.id === lastRoomId);
+            const lastRoom = data.find((r: any) => r.id === lastRoomId && (r.type !== 'GROUP' || r.isActive !== false));
             if (lastRoom) {
               setActiveRoom(lastRoom);
               return;
             }
           }
-          if (data.length > 0) {
-            setActiveRoom(data[0]);
+          const firstActive = data.find((r: any) => r.type !== 'GROUP' || r.isActive !== false);
+          if (firstActive) {
+            setActiveRoom(firstActive);
           }
         }
       } else if (res.status === 401) {
@@ -2042,11 +2050,16 @@ export default function ClinicalPlatform() {
       setAdminGroups((prev) => prev.map((g) => g.id === roomId ? { ...g, isActive: nextActive } : g));
       setRooms((prev) => prev.map((r) => r.id === roomId ? { ...r, isActive: nextActive } : r));
       if (activeRoom?.id === roomId) {
-        setActiveRoom((prev) => prev ? { ...prev, isActive: nextActive } : null);
+        if (!nextActive && activeRoom.type === 'GROUP') {
+          setActiveRoom(null);
+        } else {
+          setActiveRoom((prev) => prev ? { ...prev, isActive: nextActive } : null);
+        }
       }
       if (roomMembersModalTarget?.id === roomId) {
         setRoomMembersModalTarget((prev: any) => prev ? { ...prev, isActive: nextActive } : null);
       }
+      fetchRooms();
     } catch (err: any) {
       showToast(err.message || 'Error updating group status', 'error');
     }
@@ -3279,7 +3292,7 @@ export default function ClinicalPlatform() {
             >
               <span className="flex items-center gap-2.5 relative">
                 <MessageSquare className="h-4.5 w-4.5 shrink-0" />
-                {!isSidebarExpanded && rooms.reduce((acc, r) => acc + (r.unreadCount || 0), 0) > 0 && (
+                {!isSidebarExpanded && rooms.filter(r => r.type !== 'GROUP' || r.isActive !== false).reduce((acc, r) => acc + (r.unreadCount || 0), 0) > 0 && (
                   <span className="absolute -top-1 -right-1 block h-2 w-2 rounded-full bg-red-500 ring-1 ring-slate-900 animate-pulse"></span>
                 )}
                 {isSidebarExpanded && <span className="truncate">{translations[language].tabChats}</span>}
@@ -3287,11 +3300,11 @@ export default function ClinicalPlatform() {
               {isSidebarExpanded && (
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className="bg-teal-500/20 text-teal-400 text-xs px-2 py-0.5 rounded-full font-bold">
-                    {rooms.length}
+                    {rooms.filter(r => r.type !== 'PATIENT_CONTEXT' && (r.type !== 'GROUP' || r.isActive !== false)).length}
                   </span>
-                  {rooms.reduce((acc, r) => acc + (r.unreadCount || 0), 0) > 0 && (
+                  {rooms.filter(r => r.type !== 'GROUP' || r.isActive !== false).reduce((acc, r) => acc + (r.unreadCount || 0), 0) > 0 && (
                     <span className="bg-red-500 text-white text-[10px] font-bold h-5 min-w-[20px] px-1.5 rounded-full flex items-center justify-center animate-pulse">
-                      {rooms.reduce((acc, r) => acc + (r.unreadCount || 0), 0)}
+                      {rooms.filter(r => r.type !== 'GROUP' || r.isActive !== false).reduce((acc, r) => acc + (r.unreadCount || 0), 0)}
                     </span>
                   )}
                 </div>
@@ -3503,7 +3516,7 @@ export default function ClinicalPlatform() {
                 <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ${
                   chatListFilter === 'ALL' ? 'bg-teal-600 text-white' : 'bg-slate-700/60 text-slate-300'
                 }`}>
-                  {rooms.filter(r => r.type !== 'PATIENT_CONTEXT').length}
+                  {rooms.filter(r => r.type !== 'PATIENT_CONTEXT' && (r.type !== 'GROUP' || r.isActive !== false)).length}
                 </span>
               </button>
 
@@ -3521,7 +3534,7 @@ export default function ClinicalPlatform() {
                 <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ${
                   chatListFilter === 'GROUPS' ? 'bg-sky-600 text-white' : 'bg-slate-700/60 text-slate-300'
                 }`}>
-                  {rooms.filter(r => r.type === 'GROUP').length}
+                  {rooms.filter(r => r.type === 'GROUP' && r.isActive !== false).length}
                 </span>
               </button>
 
@@ -3569,7 +3582,7 @@ export default function ClinicalPlatform() {
               </div>
 
               {/* Empty state when filtering GROUPS and no group found */}
-              {chatListFilter === 'GROUPS' && rooms.filter(r => r.type === 'GROUP' && (r.name || '').toLowerCase().includes(chatSearchQuery.toLowerCase())).length === 0 && (
+              {chatListFilter === 'GROUPS' && rooms.filter(r => r.type === 'GROUP' && r.isActive !== false && (r.name || '').toLowerCase().includes(chatSearchQuery.toLowerCase())).length === 0 && (
                 <div className="p-5 text-center bg-slate-850/40 border border-dashed border-slate-800 rounded-2xl my-2 space-y-3">
                   <div className="h-10 w-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 mx-auto">
                     <Users className="h-5 w-5" />
@@ -3590,6 +3603,9 @@ export default function ClinicalPlatform() {
 
               {rooms
                 .filter((r) => {
+                  // For group chats that are inactive, do not display in chats list
+                  if (r.type === 'GROUP' && r.isActive === false) return false;
+
                   const matchesSearch = (r.name || '').toLowerCase().includes(chatSearchQuery.toLowerCase());
                   if (!matchesSearch) return false;
                   if (chatListFilter === 'GROUPS') return r.type === 'GROUP';
@@ -6289,9 +6305,9 @@ export default function ClinicalPlatform() {
         >
           <div className="relative">
             <MessageSquare className="h-5 w-5" />
-            {rooms.reduce((acc, r) => acc + (r.unreadCount || 0), 0) > 0 && (
+            {rooms.filter(r => r.type !== 'GROUP' || r.isActive !== false).reduce((acc, r) => acc + (r.unreadCount || 0), 0) > 0 && (
               <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[9px] font-bold h-4 min-w-[16px] px-1 rounded-full flex items-center justify-center animate-pulse">
-                {rooms.reduce((acc, r) => acc + (r.unreadCount || 0), 0)}
+                {rooms.filter(r => r.type !== 'GROUP' || r.isActive !== false).reduce((acc, r) => acc + (r.unreadCount || 0), 0)}
               </span>
             )}
           </div>
