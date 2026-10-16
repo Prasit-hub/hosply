@@ -52,7 +52,8 @@ import {
   Mic,
   MicOff,
   Smile,
-  Edit3
+  Edit3,
+  Globe
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
@@ -337,6 +338,48 @@ const translations = {
     switchToRegister: 'Register here',
     statusOnline: 'Online',
     statusOffline: 'Offline',
+
+    // Settings Extra
+    securityCredentialsTitle: 'Security Credentials & System Preferences',
+    securityCredentialsDesc: 'All message payloads are encrypted end-to-end within the database file via AES-256. Private key rotation happens under administrator supervision.',
+    systemLanguageLabel: 'System Display Language',
+    systemLanguageDesc: 'Choose your preferred language across all interface elements and notifications.',
+    visualContrastLabel: 'Visual Styling Contrast',
+    visualContrastDesc: 'Enable high-contrast mode for medical teams on night rounds.',
+    visualThemeLabel: 'System Visual Theme',
+    visualThemeDesc: 'Choose a highly tailored medical environment color theme.',
+    themeLineGreen: 'LINE Green (Default Theme)',
+    themeLinePC: 'LINE on PC (Desktop Classic)',
+    themeNavy: 'Royal Navy Compliance',
+    themeEmerald: 'Emerald Healing',
+    themeLight: 'LINE Sky Blue (Light Theme)',
+    auditExportLabel: 'Audit Log Export',
+    auditExportDesc: 'Download cryptographically signed audit logs for compliance reviews.',
+    auditExportBtn: 'Export logs (.csv)',
+
+    // Admin User Modals
+    registerUserModalTitle: 'Register Clinical User',
+    registerUserModalDesc: 'Secure credentials registry console',
+    editUserModalTitle: 'Edit Clinical Credentials',
+    editUserModalDesc: 'Internal Registry Management',
+    inputUsername: 'Username',
+    inputPassword: 'Password',
+    inputNewPasswordOptional: 'New Password (Optional)',
+    passwordLeaveBlankHint: 'Leave blank to keep current password',
+    inputFirstName: 'First Name',
+    inputLastName: 'Last Name',
+    inputProfessionalId: 'Medical License / Prof ID (Optional)',
+    inputRole: 'System & Clinical Role',
+    selectRolePrompt: 'Select a role...',
+    inputAccessStatus: 'Access Authorization',
+    activeDutyStatus: 'Active Duty',
+    deactivatedStatus: 'Deactivated',
+    updateCredentialsBtn: 'Update Credentials',
+    firstPageBtn: 'First Page',
+    lastPageBtn: 'Last Page',
+    prevPageBtn: 'Previous',
+    nextPageBtn: 'Next',
+    addUserBtn: 'Add Clinical User',
   },
   TH: {
     // Login
@@ -504,6 +547,48 @@ const translations = {
     groupChatPrefix: '👥 ปรึกษาเคสกลุ่ม',
     statusOnline: 'ออนไลน์',
     statusOffline: 'ออฟไลน์',
+
+    // Settings Extra
+    securityCredentialsTitle: 'ความปลอดภัยของข้อมูลและการตั้งค่าระบบ',
+    securityCredentialsDesc: 'ข้อความทั้งหมดถูกเข้ารหัส End-to-End (AES-256) ปลอดภัยตามมาตรฐานความปลอดภัย HIPAA และหมุนเวียนกุญแจเข้ารหัสภายใต้การควบคุมของผู้ดูแลระบบ',
+    systemLanguageLabel: 'ภาษาที่ใช้งานในระบบ',
+    systemLanguageDesc: 'เลือกภาษาที่คุณต้องการใช้งานสำหรับเมนู การแจ้งเตือน และหน้าจอทั้งหมด',
+    visualContrastLabel: 'โหมดคอนทราสต์แสงสูง',
+    visualContrastDesc: 'เปิดโหมดความคมชัดสูงสำหรับทีมแพทย์และพยาบาลขณะตรวจเวรดึก',
+    visualThemeLabel: 'ธีมสีของระบบ',
+    visualThemeDesc: 'เลือกชุดสีที่ออกแบบเฉพาะสำหรับสภาพแวดล้อมการทำงานทางการแพทย์',
+    themeLineGreen: 'เขียวไลน์ (LINE Green - ค่าเริ่มต้น)',
+    themeLinePC: 'ไลน์เดสก์ท็อป (LINE on PC - Desktop Classic)',
+    themeNavy: 'น้ำเงินเนวี (Royal Navy Compliance)',
+    themeEmerald: 'เขียวมรกต (Emerald Healing)',
+    themeLight: 'ฟ้าสว่าง (LINE Sky Blue - Light Theme)',
+    auditExportLabel: 'ส่งออกบันทึกการตรวจสอบ',
+    auditExportDesc: 'ดาวน์โหลดประวัติกิจกรรมความปลอดภัยเพื่อใช้ในการตรวจสอบมาตรฐานคลินิก',
+    auditExportBtn: 'ส่งออกไฟล์ (.csv)',
+
+    // Admin User Modals
+    registerUserModalTitle: 'ลงทะเบียนบัญชีบุคลากรใหม่',
+    registerUserModalDesc: 'ระบบบันทึกและจัดการสิทธิ์ผู้ใช้งานคลินิก',
+    editUserModalTitle: 'แก้ไขข้อมูลและสิทธิ์บุคลากร',
+    editUserModalDesc: 'ระบบจัดการรายชื่อและสิทธิ์การใช้งานภายในคลินิก',
+    inputUsername: 'ชื่อผู้ใช้งาน (Username)',
+    inputPassword: 'รหัสผ่านความปลอดภัย',
+    inputNewPasswordOptional: 'รหัสผ่านใหม่ (ถ้าต้องการเปลี่ยน)',
+    passwordLeaveBlankHint: 'เว้นว่างไว้หากต้องการใช้รหัสผ่านเดิม',
+    inputFirstName: 'ชื่อจริง',
+    inputLastName: 'นามสกุล',
+    inputProfessionalId: 'เลขที่ใบประกอบวิชาชีพ / รหัสพนักงาน (ถ้ามี)',
+    inputRole: 'ตำแหน่งวิชาชีพและสิทธิ์ในระบบ',
+    selectRolePrompt: 'เลือกตำแหน่งวิชาชีพ...',
+    inputAccessStatus: 'สถานะการอนุญาตเข้าใช้งาน',
+    activeDutyStatus: 'ปฏิบัติหน้าที่ (Active Duty)',
+    deactivatedStatus: 'ระงับการใช้งาน (Deactivated)',
+    updateCredentialsBtn: 'บันทึกการแก้ไขข้อมูล',
+    firstPageBtn: 'หน้าแรก',
+    lastPageBtn: 'หน้าสุดท้าย',
+    prevPageBtn: 'ก่อนหน้า',
+    nextPageBtn: 'ถัดไป',
+    addUserBtn: 'ลงทะเบียนบุคลากร',
   }
 };
 
@@ -1429,7 +1514,7 @@ export default function ClinicalPlatform() {
       });
     } catch (err: any) {
       console.error('Login failed:', err);
-      setLoginError('ชื่อผู้ใช้งาน/รหัสผ่านไม่ถูกต้อง หรือเซิร์ฟเวอร์ออฟไลน์ กรุณาลองใหม่อีกครั้ง');
+      setLoginError(language === 'TH' ? 'ชื่อผู้ใช้งาน/รหัสผ่านไม่ถูกต้อง หรือเซิร์ฟเวอร์ออฟไลน์ กรุณาลองใหม่อีกครั้ง' : 'Invalid username/password or server offline. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -1525,12 +1610,12 @@ export default function ClinicalPlatform() {
     setPasswordResetSuccess('');
 
     if (newPasswordInput.length < 6) {
-      setPasswordResetError('รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6 ตัวอักษร');
+      setPasswordResetError(language === 'TH' ? 'รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6 ตัวอักษร' : 'New password must be at least 6 characters');
       return;
     }
 
     if (newPasswordInput !== confirmPasswordInput) {
-      setPasswordResetError('รหัสผ่านใหม่ไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง');
+      setPasswordResetError(language === 'TH' ? 'รหัสผ่านใหม่ไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง' : 'New passwords do not match. Please verify.');
       return;
     }
 
@@ -1552,17 +1637,17 @@ export default function ClinicalPlatform() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'ไม่สามารถเปลี่ยนรหัสผ่านได้ รหัสผ่านปัจจุบันอาจไม่ถูกต้อง');
+        throw new Error(data.message || (language === 'TH' ? 'ไม่สามารถเปลี่ยนรหัสผ่านได้ รหัสผ่านปัจจุบันอาจไม่ถูกต้อง' : 'Failed to reset password. Current password may be incorrect.'));
       }
 
-      setPasswordResetSuccess('เปลี่ยนรหัสผ่านเสร็จสมบูรณ์เรียบร้อยแล้ว!');
+      setPasswordResetSuccess(language === 'TH' ? 'เปลี่ยนรหัสผ่านเสร็จสมบูรณ์เรียบร้อยแล้ว!' : 'Password reset successfully completed!');
       setCurrentPasswordInput('');
       setNewPasswordInput('');
       setConfirmPasswordInput('');
-      showToast('เปลี่ยนรหัสผ่านเรียบร้อยแล้ว', 'success');
+      showToast(language === 'TH' ? 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว' : 'Password changed successfully', 'success');
     } catch (err: any) {
-      setPasswordResetError(err.message || 'ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง');
-      showToast(err.message || 'เปลี่ยนรหัสผ่านไม่สำเร็จ', 'error');
+      setPasswordResetError(err.message || (language === 'TH' ? 'ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง' : 'System error. Please try again.'));
+      showToast(err.message || (language === 'TH' ? 'เปลี่ยนรหัสผ่านไม่สำเร็จ' : 'Failed to change password'), 'error');
     } finally {
       setIsResettingPassword(false);
     }
@@ -3604,7 +3689,7 @@ export default function ClinicalPlatform() {
             </div>
 
             <div className="flex items-center gap-2">
-              {isSidebarExpanded && (
+              {isSidebarExpanded ? (
                 <div className="flex items-center gap-1 bg-slate-800/60 p-0.5 rounded-lg border border-slate-700/60 mr-1 animate-fade-in shrink-0">
                   <button
                     onClick={() => changeLanguage('TH')}
@@ -3625,6 +3710,14 @@ export default function ClinicalPlatform() {
                     EN
                   </button>
                 </div>
+              ) : (
+                <button
+                  onClick={() => changeLanguage(language === 'TH' ? 'EN' : 'TH')}
+                  className="px-1.5 py-1 rounded-md text-[9px] font-black bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700/60 transition-all active:scale-95 shrink-0"
+                  title={`Switch language: ${language === 'TH' ? 'English' : 'ภาษาไทย'}`}
+                >
+                  {language}
+                </button>
               )}
 
               {/* Toggle Button */}
@@ -4272,7 +4365,7 @@ export default function ClinicalPlatform() {
                       <Database className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">Database</p>
+                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{language === 'TH' ? 'ฐานข้อมูล' : 'Database'}</p>
                       <h3 className="text-xs sm:text-base font-black text-white truncate">SQLite + Prisma</h3>
                     </div>
                   </div>
@@ -4282,8 +4375,8 @@ export default function ClinicalPlatform() {
                       <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">DLP Intercepts</p>
-                      <h3 className="text-xs sm:text-base font-black text-white truncate">{dlpAlertsCount} Blocked</h3>
+                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{language === 'TH' ? 'ตรวจจับ DLP' : 'DLP Intercepts'}</p>
+                      <h3 className="text-xs sm:text-base font-black text-white truncate">{dlpAlertsCount} {language === 'TH' ? 'บล็อก' : 'Blocked'}</h3>
                     </div>
                   </div>
 
@@ -4292,7 +4385,7 @@ export default function ClinicalPlatform() {
                       <HardDrive className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">Storage</p>
+                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{language === 'TH' ? 'พื้นที่จัดเก็บ' : 'Storage'}</p>
                       <h3 className="text-xs sm:text-base font-black text-white truncate">{storageUsage.used} / {storageUsage.total}</h3>
                     </div>
                   </div>
@@ -4302,8 +4395,8 @@ export default function ClinicalPlatform() {
                       <Clock className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">Sessions</p>
-                      <h3 className="text-xs sm:text-base font-black text-white truncate">{activeSessionsCount} active</h3>
+                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{language === 'TH' ? 'เซสชัน' : 'Sessions'}</p>
+                      <h3 className="text-xs sm:text-base font-black text-white truncate">{activeSessionsCount} {language === 'TH' ? 'ใช้งานอยู่' : 'active'}</h3>
                     </div>
                   </div>
                 </div>
@@ -4374,7 +4467,7 @@ export default function ClinicalPlatform() {
                                   {log.action}
                                 </span>
                                 <div className="text-slate-400 font-medium text-xs flex items-center gap-1.5 flex-wrap">
-                                  <span>by</span>
+                                  <span>{language === 'TH' ? 'โดย' : 'by'}</span>
                                   {hasName && (
                                     <span className="text-slate-200 font-semibold">
                                       {log.user?.firstName} {log.user?.lastName}
@@ -4385,7 +4478,7 @@ export default function ClinicalPlatform() {
                                       @{username}
                                     </span>
                                   ) : (
-                                    <span className="text-slate-500 italic text-[11px]">System</span>
+                                    <span className="text-slate-500 italic text-[11px]">{language === 'TH' ? 'ระบบ' : 'System'}</span>
                                   )}
                                   {userRole && (
                                     <span className="text-[9px] font-bold tracking-wider uppercase bg-slate-800 text-slate-400 border border-slate-700/60 px-1.5 py-0.5 rounded">
@@ -4431,8 +4524,12 @@ export default function ClinicalPlatform() {
                   {/* Search and Action Bar */}
                   <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-xl">
                     <div className="space-y-0.5">
-                      <h3 className="font-extrabold text-white text-xs sm:text-sm">Active Staff Directory Management</h3>
-                      <p className="text-[10px] sm:text-[11px] text-slate-400">Add, edit, or deactivate professional clinical credentials & system roles.</p>
+                      <h3 className="font-extrabold text-white text-xs sm:text-sm">
+                        {language === 'TH' ? 'ระบบจัดการรายชื่อและสิทธิ์บุคลากร' : 'Active Staff Directory Management'}
+                      </h3>
+                      <p className="text-[10px] sm:text-[11px] text-slate-400">
+                        {language === 'TH' ? 'เพิ่ม แก้ไข หรือระงับสิทธิ์การเข้าใช้งานระบบของบุคลากรคลินิก' : 'Add, edit, or deactivate professional clinical credentials & system roles.'}
+                      </p>
                     </div>
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
                       <div className="relative w-full sm:w-64">
@@ -4443,7 +4540,7 @@ export default function ClinicalPlatform() {
                             setUserSearchQuery(e.target.value);
                             setUserListPage(1);
                           }}
-                          placeholder="Search staff directory..."
+                          placeholder={language === 'TH' ? 'ค้นหารายชื่อบุคลากร...' : 'Search staff directory...'}
                           className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 pl-9 pr-4 text-xs text-white focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 placeholder-slate-500 font-medium transition-all"
                         />
                         <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
@@ -4457,7 +4554,7 @@ export default function ClinicalPlatform() {
                         }}
                         className="bg-teal-500 hover:bg-teal-600 text-white text-xs font-bold uppercase px-4 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-teal-500/10 active:scale-95 whitespace-nowrap shrink-0"
                       >
-                        <UserPlus className="h-4 w-4" /> Add Clinical User
+                        <UserPlus className="h-4 w-4" /> {translations[language].addUserBtn}
                       </button>
                     </div>
                   </div>
@@ -4468,19 +4565,19 @@ export default function ClinicalPlatform() {
                       <table className="w-full text-left border-collapse">
                         <thead>
                           <tr className="bg-slate-950/80 text-[10px] text-slate-400 uppercase font-black tracking-wider border-b border-slate-800">
-                            <th className="px-6 py-4">Clinical Staff Name</th>
-                            <th className="px-6 py-4">Username</th>
-                            <th className="px-6 py-4">Clinical Role</th>
-                            <th className="px-6 py-4">Medical License / ID</th>
-                            <th className="px-6 py-4">Access Status</th>
-                            <th className="px-6 py-4 text-right">Actions</th>
+                            <th className="px-6 py-4">{language === 'TH' ? 'ชื่อ-นามสกุล บุคลากร' : 'Clinical Staff Name'}</th>
+                            <th className="px-6 py-4">{language === 'TH' ? 'ชื่อผู้ใช้' : 'Username'}</th>
+                            <th className="px-6 py-4">{language === 'TH' ? 'ตำแหน่งวิชาชีพ' : 'Clinical Role'}</th>
+                            <th className="px-6 py-4">{language === 'TH' ? 'เลขที่ใบประกอบวิชาชีพ / รหัส' : 'Medical License / ID'}</th>
+                            <th className="px-6 py-4">{language === 'TH' ? 'สถานะการเข้าใช้' : 'Access Status'}</th>
+                            <th className="px-6 py-4 text-right">{language === 'TH' ? 'การจัดการ' : 'Actions'}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/80 text-xs">
                           {paginatedUsers.length === 0 ? (
                             <tr>
                               <td colSpan={6} className="px-6 py-8 text-center text-slate-500 font-medium">
-                                No clinical users found matching "{userSearchQuery}"
+                                {language === 'TH' ? `ไม่พบบุคลากรที่ตรงกับ "${userSearchQuery}"` : `No clinical users found matching "${userSearchQuery}"`}
                               </td>
                             </tr>
                           ) : (
@@ -4629,16 +4726,18 @@ export default function ClinicalPlatform() {
                     {filteredUsers.length > 0 && (
                       <div className="bg-slate-950/40 border-t border-slate-800 px-4 sm:px-6 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
                         <div className="text-slate-400 font-medium text-[11px] sm:text-xs text-center sm:text-left">
-                          Showing <span className="text-white font-bold">{Math.min(filteredUsers.length, (userListPage - 1) * ITEMS_PER_PAGE + 1)}</span> to{' '}
-                          <span className="text-white font-bold">{Math.min(filteredUsers.length, userListPage * ITEMS_PER_PAGE)}</span> of{' '}
-                          <span className="text-white font-bold">{filteredUsers.length}</span> entries
+                          {language === 'TH' ? (
+                            <>แสดง <span className="text-white font-bold">{Math.min(filteredUsers.length, (userListPage - 1) * ITEMS_PER_PAGE + 1)}</span> ถึง <span className="text-white font-bold">{Math.min(filteredUsers.length, userListPage * ITEMS_PER_PAGE)}</span> จากทั้งหมด <span className="text-white font-bold">{filteredUsers.length}</span> รายการ</>
+                          ) : (
+                            <>Showing <span className="text-white font-bold">{Math.min(filteredUsers.length, (userListPage - 1) * ITEMS_PER_PAGE + 1)}</span> to <span className="text-white font-bold">{Math.min(filteredUsers.length, userListPage * ITEMS_PER_PAGE)}</span> of <span className="text-white font-bold">{filteredUsers.length}</span> entries</>
+                          )}
                         </div>
                         <div className="flex items-center gap-1 font-bold">
                           <button
                             onClick={() => setUserListPage(1)}
                             disabled={userListPage === 1}
                             className="bg-slate-900 hover:bg-slate-800 border border-slate-800 disabled:opacity-30 disabled:hover:bg-slate-900 text-slate-300 p-1.5 rounded-lg transition-all active:scale-95"
-                            title="First Page"
+                            title={translations[language].firstPageBtn}
                           >
                             <ChevronsLeft className="h-4 w-4" />
                           </button>
@@ -4647,7 +4746,7 @@ export default function ClinicalPlatform() {
                             disabled={userListPage === 1}
                             className="bg-slate-900 hover:bg-slate-800 border border-slate-800 disabled:opacity-30 disabled:hover:bg-slate-900 text-slate-300 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all active:scale-95 flex items-center gap-1 text-[11px]"
                           >
-                            <ChevronLeft className="h-4 w-4" /> Prev
+                            <ChevronLeft className="h-4 w-4" /> {translations[language].prevPageBtn}
                           </button>
 
                           <span className="px-2 text-slate-300 text-xs font-mono">
@@ -4659,13 +4758,13 @@ export default function ClinicalPlatform() {
                             disabled={userListPage === totalPages}
                             className="bg-slate-900 hover:bg-slate-800 border border-slate-800 disabled:opacity-30 disabled:hover:bg-slate-900 text-slate-300 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all active:scale-95 flex items-center gap-1 text-[11px]"
                           >
-                            Next <ChevronRight className="h-4 w-4" />
+                            {translations[language].nextPageBtn} <ChevronRight className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => setUserListPage(totalPages)}
                             disabled={userListPage === totalPages}
                             className="bg-slate-900 hover:bg-slate-800 border border-slate-800 disabled:opacity-30 disabled:hover:bg-slate-900 text-slate-300 p-1.5 rounded-lg transition-all active:scale-95"
-                            title="Last Page"
+                            title={translations[language].lastPageBtn}
                           >
                             <ChevronsRight className="h-4 w-4" />
                           </button>
@@ -4730,11 +4829,11 @@ export default function ClinicalPlatform() {
                     <table className="w-full text-left text-xs">
                       <thead className="bg-slate-950/70 border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400 font-bold">
                         <tr>
-                          <th className="px-6 py-3.5">ชื่อกลุ่มแชต (Group Name)</th>
-                          <th className="px-6 py-3.5">ประเภท (Type)</th>
-                          <th className="px-6 py-3.5">สมาชิก (Members)</th>
-                          <th className="px-6 py-3.5">สถานะ (Status)</th>
-                          <th className="px-6 py-3.5 text-right">การจัดการ (Actions)</th>
+                          <th className="px-6 py-3.5">{language === 'TH' ? 'ชื่อกลุ่มแชต' : 'Group Name'}</th>
+                          <th className="px-6 py-3.5">{language === 'TH' ? 'ประเภท' : 'Type'}</th>
+                          <th className="px-6 py-3.5">{language === 'TH' ? 'สมาชิก' : 'Members'}</th>
+                          <th className="px-6 py-3.5">{language === 'TH' ? 'สถานะ' : 'Status'}</th>
+                          <th className="px-6 py-3.5 text-right">{language === 'TH' ? 'การจัดการ' : 'Actions'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/60">
@@ -5082,48 +5181,86 @@ export default function ClinicalPlatform() {
               </div>
             </div>
 
+            {/* System Display Language Card */}
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4">
-              <h3 className="text-md font-bold text-white flex items-center gap-2"><Lock className="h-5 w-5 text-teal-400" /> Security Credentials</h3>
-              <p className="text-xs text-slate-400">All message payloads are encrypted end-to-end within the database file via AES-256. Private key rotation happens under administrator supervision.</p>
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                <div>
+                  <h3 className="text-md font-bold text-white flex items-center gap-2">
+                    <Globe className="h-5 w-5 text-teal-400" /> {translations[language].systemLanguageLabel}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">{translations[language].systemLanguageDesc}</p>
+                </div>
+                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 p-1 rounded-xl shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => changeLanguage('TH')}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      language === 'TH'
+                        ? 'bg-teal-500 text-white shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>🇹🇭</span>
+                    <span>ภาษาไทย (TH)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => changeLanguage('EN')}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      language === 'EN'
+                        ? 'bg-teal-500 text-white shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>🇺🇸</span>
+                    <span>English (EN)</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4">
+              <h3 className="text-md font-bold text-white flex items-center gap-2"><Lock className="h-5 w-5 text-teal-400" /> {translations[language].securityCredentialsTitle}</h3>
+              <p className="text-xs text-slate-400">{translations[language].securityCredentialsDesc}</p>
 
               <div className="border-t border-slate-800 pt-4 flex justify-between items-center">
                 <div>
-                  <p className="text-xs font-bold text-white">Visual Styling Contrast</p>
-                  <span className="text-[10px] text-slate-500">Enable high-contrast mode for medical teams on night rounds.</span>
+                  <p className="text-xs font-bold text-white">{translations[language].visualContrastLabel}</p>
+                  <span className="text-[10px] text-slate-500">{translations[language].visualContrastDesc}</span>
                 </div>
                 <button
                   onClick={() => setIsDarkMode(!isDarkMode)}
                   className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-700 transition-all"
                 >
-                  Toggle Contrast ({isDarkMode ? 'Dark Mode' : 'Light Mode'})
+                  {language === 'TH' ? `สลับคอนทราสต์ (${isDarkMode ? 'โหมดมืด' : 'โหมดสว่าง'})` : `Toggle Contrast (${isDarkMode ? 'Dark Mode' : 'Light Mode'})`}
                 </button>
               </div>
 
               <div className="border-t border-slate-800 pt-4 flex justify-between items-center">
                 <div>
-                  <p className="text-xs font-bold text-white">System Visual Theme</p>
-                  <span className="text-[10px] text-slate-500">Choose a highly tailored medical environment color theme.</span>
+                  <p className="text-xs font-bold text-white">{translations[language].visualThemeLabel}</p>
+                  <span className="text-[10px] text-slate-500">{translations[language].visualThemeDesc}</span>
                 </div>
                 <select
                   value={currentTheme}
                   onChange={(e) => setCurrentTheme(e.target.value as any)}
                   className="bg-slate-800 border border-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-teal-500"
                 >
-                  <option value="teal">LINE Green (Default Theme)</option>
-                  <option value="line_pc">LINE on PC (Desktop Classic)</option>
-                  <option value="navy">Royal Navy Compliance</option>
-                  <option value="emerald">Emerald Healing</option>
-                  <option value="light">LINE Sky Blue (Light Theme)</option>
+                  <option value="teal">{translations[language].themeLineGreen}</option>
+                  <option value="line_pc">{translations[language].themeLinePC}</option>
+                  <option value="navy">{translations[language].themeNavy}</option>
+                  <option value="emerald">{translations[language].themeEmerald}</option>
+                  <option value="light">{translations[language].themeLight}</option>
                 </select>
               </div>
 
               <div className="border-t border-slate-800 pt-4 flex justify-between items-center">
                 <div>
-                  <p className="text-xs font-bold text-white">Audit Log Export</p>
-                  <span className="text-[10px] text-slate-500">Download cryptographically signed audit logs for compliance reviews.</span>
+                  <p className="text-xs font-bold text-white">{translations[language].auditExportLabel}</p>
+                  <span className="text-[10px] text-slate-500">{translations[language].auditExportDesc}</span>
                 </div>
                 <button className="bg-teal-500 text-white rounded-lg px-4 py-2 text-xs font-bold hover:bg-teal-600 transition-all">
-                  Export logs (.csv)
+                  {translations[language].auditExportBtn}
                 </button>
               </div>
             </div>
@@ -6183,10 +6320,10 @@ export default function ClinicalPlatform() {
                 <Lock className="h-4.5 w-4.5 text-teal-400 animate-pulse" />
                 <div>
                   <h3 className="text-xs font-black text-white uppercase tracking-wider">
-                    Secure In-App Previewer
+                    {language === 'TH' ? 'ระบบเปิดดูเอกสารปลอดภัย' : 'Secure In-App Previewer'}
                   </h3>
                   <p className="text-[10px] text-slate-500 font-bold uppercase">
-                    HIPAA Compliance Locked • Download Restricted
+                    {language === 'TH' ? 'จำกัดสิทธิ์ตามมาตรฐาน HIPAA • ห้ามดาวน์โหลด' : 'HIPAA Compliance Locked • Download Restricted'}
                   </p>
                 </div>
               </div>
@@ -6256,13 +6393,13 @@ export default function ClinicalPlatform() {
             {/* Footer with lock banner */}
             <div className="px-5 py-4 border-t border-slate-800 flex items-center justify-between bg-slate-950/80">
               <span className="text-[10px] text-rose-400 font-bold flex items-center gap-1">
-                <AlertTriangle className="h-3.5 w-3.5 animate-pulse" /> Direct downloads are disabled for security tracking.
+                <AlertTriangle className="h-3.5 w-3.5 animate-pulse" /> {language === 'TH' ? 'ระงับการดาวน์โหลดโดยตรงเพื่อความปลอดภัยของข้อมูลผู้ป่วย' : 'Direct downloads are disabled for security tracking.'}
               </span>
               <button
                 onClick={() => setPreviewingFile(null)}
                 className="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs px-4 py-2 rounded-lg border border-slate-700 transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
-                Close Previewer
+                {language === 'TH' ? 'ปิดหน้าต่าง' : 'Close Previewer'}
               </button>
             </div>
           </div>
@@ -6928,15 +7065,15 @@ export default function ClinicalPlatform() {
         <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 max-w-md w-full p-6 rounded-2xl space-y-4 shadow-2xl clinical-glow animate-fade-in">
             <h3 className="text-lg font-black text-white flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-teal-400" /> Register Clinical User
+              <UserPlus className="h-5 w-5 text-teal-400" /> {translations[language].registerUserModalTitle}
             </h3>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-              Secure credentials registry console
+              {translations[language].registerUserModalDesc}
             </p>
 
             <form onSubmit={handleCreateUser} className="space-y-3.5 text-xs text-slate-300">
               <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Username</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">{translations[language].inputUsername}</label>
                 <input
                   type="text"
                   required
@@ -6948,7 +7085,7 @@ export default function ClinicalPlatform() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Secure Password</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">{translations[language].inputPassword}</label>
                 <input
                   type="password"
                   required
@@ -6961,7 +7098,7 @@ export default function ClinicalPlatform() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">First Name</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">{translations[language].inputFirstName}</label>
                   <input
                     type="text"
                     required
@@ -6972,7 +7109,7 @@ export default function ClinicalPlatform() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Last Name</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">{translations[language].inputLastName}</label>
                   <input
                     type="text"
                     required
@@ -6985,7 +7122,7 @@ export default function ClinicalPlatform() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Medical License / Prof ID (Optional)</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">{translations[language].inputProfessionalId}</label>
                 <input
                   type="text"
                   placeholder="e.g. MD-99887"
@@ -6996,16 +7133,16 @@ export default function ClinicalPlatform() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">System & Clinical Role</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">{translations[language].inputRole}</label>
                 <select
                   required
                   value={newUserData.roleId}
                   onChange={(e) => setNewUserData({ ...newUserData, roleId: e.target.value })}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-teal-500 font-bold"
                 >
-                  <option value="" disabled>Select a role...</option>
+                  <option value="" disabled>{translations[language].selectRolePrompt}</option>
                   {adminRoles.map(role => (
-                    <option key={role.id} value={role.id}>{role.name}</option>
+                    <option key={role.id} value={role.id}>{getRoleLabel(role.name, language)}</option>
                   ))}
                 </select>
               </div>
@@ -7016,13 +7153,13 @@ export default function ClinicalPlatform() {
                   onClick={() => setShowAddUserModal(false)}
                   className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-lg text-slate-300 transition-all"
                 >
-                  Cancel
+                  {translations[language].cancelBtn}
                 </button>
                 <button
                   type="submit"
                   className="bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg transition-all"
                 >
-                  Register User
+                  {translations[language].addUserBtn}
                 </button>
               </div>
             </form>
@@ -7035,15 +7172,15 @@ export default function ClinicalPlatform() {
         <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 max-w-md w-full p-6 rounded-2xl space-y-4 shadow-2xl clinical-glow animate-fade-in">
             <h3 className="text-lg font-black text-white flex items-center gap-2">
-              <Shield className="h-5 w-5 text-teal-400" /> Edit Clinical Credentials
+              <Shield className="h-5 w-5 text-teal-400" /> {translations[language].editUserModalTitle}
             </h3>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-              Internal Registry Management
+              {translations[language].editUserModalDesc}
             </p>
 
             <form onSubmit={handleUpdateUser} className="space-y-3.5 text-xs text-slate-300">
               <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Username</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">{translations[language].inputUsername}</label>
                 <input
                   type="text"
                   required
@@ -7054,10 +7191,10 @@ export default function ClinicalPlatform() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Update Password (Optional)</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">{translations[language].inputNewPasswordOptional}</label>
                 <input
                   type="password"
-                  placeholder="Leave blank to keep current password"
+                  placeholder={translations[language].passwordLeaveBlankHint}
                   value={editingUserData.password}
                   onChange={(e) => setEditingUserData({ ...editingUserData, password: e.target.value })}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-teal-500 font-medium"
@@ -7066,7 +7203,7 @@ export default function ClinicalPlatform() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">First Name</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">{translations[language].inputFirstName}</label>
                   <input
                     type="text"
                     required
@@ -7076,7 +7213,7 @@ export default function ClinicalPlatform() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Last Name</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">{translations[language].inputLastName}</label>
                   <input
                     type="text"
                     required
@@ -7088,7 +7225,7 @@ export default function ClinicalPlatform() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Medical License / Prof ID (Optional)</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">{translations[language].inputProfessionalId}</label>
                 <input
                   type="text"
                   value={editingUserData.professionalId}
@@ -7098,7 +7235,7 @@ export default function ClinicalPlatform() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">System & Clinical Role</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">{translations[language].inputRole}</label>
                 <select
                   required
                   value={editingUserData.roleId}
@@ -7106,13 +7243,13 @@ export default function ClinicalPlatform() {
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-teal-500 font-bold"
                 >
                   {adminRoles.map(role => (
-                    <option key={role.id} value={role.id}>{role.name}</option>
+                    <option key={role.id} value={role.id}>{getRoleLabel(role.name, language)}</option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Access Authorization</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">{translations[language].inputAccessStatus}</label>
                 <div className="flex gap-4 mt-1 font-bold">
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
@@ -7121,7 +7258,7 @@ export default function ClinicalPlatform() {
                       onChange={() => setEditingUserData({ ...editingUserData, isActive: true })}
                       className="text-teal-500 focus:ring-teal-500/50 bg-slate-800 border-slate-700"
                     />
-                    <span className="text-green-400">Authorize Active Duty</span>
+                    <span className="text-green-400">{translations[language].activeDutyStatus}</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
@@ -7130,7 +7267,7 @@ export default function ClinicalPlatform() {
                       onChange={() => setEditingUserData({ ...editingUserData, isActive: false })}
                       className="text-rose-500 focus:ring-rose-500/50 bg-slate-800 border-slate-700"
                     />
-                    <span className="text-rose-500">Deactivate / Suspend</span>
+                    <span className="text-rose-500">{translations[language].deactivatedStatus}</span>
                   </label>
                 </div>
               </div>
@@ -7141,13 +7278,13 @@ export default function ClinicalPlatform() {
                   onClick={() => setShowEditUserModal(false)}
                   className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-lg text-slate-300 transition-all"
                 >
-                  Cancel
+                  {translations[language].cancelBtn}
                 </button>
                 <button
                   type="submit"
                   className="bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg transition-all"
                 >
-                  Save Changes
+                  {translations[language].updateCredentialsBtn}
                 </button>
               </div>
             </form>
