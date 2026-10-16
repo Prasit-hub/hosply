@@ -367,7 +367,7 @@ export class StorageService {
         roomId,
         senderId,
         content: '', // Empty text
-        classification: 'INTERNAL',
+        classification: 'PUBLIC',
         attachments: {
           create: {
             fileName: file.originalname,

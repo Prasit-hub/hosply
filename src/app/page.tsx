@@ -743,7 +743,7 @@ export default function ClinicalPlatform() {
   };
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState('');
-  const [selectedClassification, setSelectedClassification] = useState<'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED'>('INTERNAL');
+  const [selectedClassification, setSelectedClassification] = useState<'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED'>('PUBLIC');
 
   // Real-time DLP States
   const [dlpWarning, setDlpWarning] = useState<{ flagged: boolean; reason?: string; match?: string } | null>(null);

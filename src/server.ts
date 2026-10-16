@@ -194,7 +194,7 @@ app.prepare().then(() => {
           data.roomId,
           user.id,
           data.content,
-          data.classification || 'INTERNAL',
+          data.classification || 'PUBLIC',
           ip,
           data.messageId
         );

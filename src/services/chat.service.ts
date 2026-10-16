@@ -483,7 +483,7 @@ export class ChatService {
     };
   }
 
-  async sendMessage(roomId: string, senderId: string, content: string, classification = 'INTERNAL', ipAddress?: string, messageId?: string) {
+  async sendMessage(roomId: string, senderId: string, content: string, classification = 'PUBLIC', ipAddress?: string, messageId?: string) {
     // 1. Check membership
     const membership = await prisma.roomMember.findUnique({
       where: { roomId_userId: { roomId, userId: senderId } },
